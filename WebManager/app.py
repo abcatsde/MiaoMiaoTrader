@@ -22,6 +22,7 @@ CONFIG_DIR = ROOT_DIR / "config"
 APP_CONFIG_PATH = CONFIG_DIR / "app.json"
 LLM_CONFIG_PATH = CONFIG_DIR / "llm.json"
 OKX_CONFIG_PATH = CONFIG_DIR / "okx.json"
+TOKEN_PATH = CONFIG_DIR / "web_token.txt"
 RESTART_SIGNAL_PATH = CONFIG_DIR / "restart.signal"
 
 
@@ -79,7 +80,13 @@ class TokenState:
 
 
 app = FastAPI(title="MiaoMiaoTrader Web Manager")
-TOKEN_STATE = TokenState(token=secrets.token_urlsafe(24))
+CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+if TOKEN_PATH.exists():
+    TOKEN_STATE = TokenState(token=TOKEN_PATH.read_text(encoding="utf-8").strip())
+else:
+    token = secrets.token_urlsafe(24)
+    TOKEN_PATH.write_text(token, encoding="utf-8")
+    TOKEN_STATE = TokenState(token=token)
 logger = logging.getLogger(__name__)
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "templates")), name="static")
