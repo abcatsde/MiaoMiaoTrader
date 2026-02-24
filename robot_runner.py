@@ -98,7 +98,7 @@ def _openai_generate(
     raise last_error or RuntimeError("LLM request failed")
 
 
-def _build_llm_client(config: dict) -> LLMClient:
+def _build_llm_client(config: dict, monitoring: MonitoringClient | None = None) -> LLMClient:
     providers_cfg = config.get("llm_providers", [])
     timeout = int(config.get("llm_timeout_sec", 30) or 30)
     providers: list[LLMProvider] = []
@@ -119,7 +119,7 @@ def _build_llm_client(config: dict) -> LLMClient:
 
     if not providers:
         raise RuntimeError("No enabled LLM providers configured.")
-    return LLMClient(providers=providers)
+    return LLMClient(providers=providers, monitoring=monitoring)
 
 
 def _build_planner(config: dict, llm: LLMClient, memory: MemoryClient, monitoring: MonitoringClient) -> Planner:
@@ -345,13 +345,13 @@ def run_robot() -> None:
 
         try:
             try:
-                llm = _build_llm_client(config)
+                monitoring = MonitoringClient()
+                llm = _build_llm_client(config, monitoring)
             except RuntimeError as exc:
                 logger.warning("LLM初始化失败：%s", exc)
                 time.sleep(max(interval, 5))
                 continue
             memory = MemoryClient()
-            monitoring = MonitoringClient()
             planner = _build_planner(config, llm, memory, monitoring)
             okx = _build_okx(config)
             _start_okx_ws(config, monitoring)

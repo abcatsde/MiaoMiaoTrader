@@ -31,7 +31,7 @@ def build_okx_actions(
 
     def fetch_account_and_market(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         pairs = inputs.get("pairs")
         bars = inputs.get("bars")
         inst_type = inputs.get("inst_type", "SPOT")
@@ -50,7 +50,7 @@ def build_okx_actions(
 
     def place_order(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.place_order(**inputs)
         if monitoring:
             monitoring.increment_stat("trade_count")
@@ -62,13 +62,13 @@ def build_okx_actions(
         if not inst_id or not ord_id:
             return _missing_inst_id("okx.cancel_order")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.cancel_order(inst_id=inst_id, ord_id=ord_id)
         return {"outputs": {"cancel_result": result}}
 
     def place_algo_order(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.place_algo_order(**inputs)
         if monitoring:
             monitoring.increment_stat("trade_count")
@@ -80,7 +80,7 @@ def build_okx_actions(
         if not inst_id or not algo_id:
             return _missing_inst_id("okx.cancel_algo_order")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.cancel_algo_order(inst_id=inst_id, algo_id=algo_id)
         return {"outputs": {"cancel_algo_result": result}}
 
@@ -90,7 +90,7 @@ def build_okx_actions(
         if not inst_id or lever is None:
             return _missing_inst_id("okx.set_leverage")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.set_leverage(
             inst_id=inst_id,
             lever=str(lever),
@@ -140,7 +140,7 @@ def build_okx_actions(
         if not inst_id:
             return _missing_inst_id("okx.get_ticker")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.get_ticker(inst_id=inst_id)
         return {"outputs": {"ticker": result}}
 
@@ -149,7 +149,7 @@ def build_okx_actions(
         if not inst_id:
             return _missing_inst_id("okx.get_candles")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.get_candles(
             inst_id=inst_id,
             bar=str(inputs.get("bar", "15m")),
@@ -162,7 +162,7 @@ def build_okx_actions(
         if not inst_id:
             return _missing_inst_id("okx.get_orderbook")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.get_orderbook(inst_id=inst_id, sz=int(inputs.get("sz", 20)))
         return {"outputs": {"orderbook": result}}
 
@@ -171,7 +171,7 @@ def build_okx_actions(
         if not inst_id:
             return _missing_inst_id("okx.get_trades")
         if monitoring:
-            monitoring.increment_stat("request_count")
+            monitoring.increment_stat("okx_request_count")
         result = okx.get_trades(inst_id=inst_id, limit=int(inputs.get("limit", 100)))
         return {"outputs": {"trades": result}}
 

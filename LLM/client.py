@@ -4,6 +4,8 @@ from dataclasses import dataclass
 import logging
 from typing import Callable, Iterable, Sequence
 
+from Monitoring import MonitoringClient
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,9 +27,15 @@ class LLMConfig:
 class LLMClient:
     """Multi-provider LLM client with retry and failover."""
 
-    def __init__(self, providers: Sequence[LLMProvider], config: LLMConfig | None = None) -> None:
+    def __init__(
+        self,
+        providers: Sequence[LLMProvider],
+        config: LLMConfig | None = None,
+        monitoring: MonitoringClient | None = None,
+    ) -> None:
         self._providers = list(providers)
         self._config = config or LLMConfig()
+        self._monitoring = monitoring
 
     def generate(self, prompt: str) -> str:
         if not self._providers:
@@ -38,7 +46,10 @@ class LLMClient:
         for index, provider in enumerate(self._providers, start=1):
             for attempt in range(1, self._config.max_retries + 2):
                 try:
-                    return provider.generate(prompt)
+                    result = provider.generate(prompt)
+                    if self._monitoring:
+                        self._monitoring.increment_stat("request_count")
+                    return result
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
                     logger.debug(

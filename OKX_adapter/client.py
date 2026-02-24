@@ -191,7 +191,11 @@ class OKXClient:
         if params:
             url += "?" + urlencode(params)
 
-        headers = {"Content-Type": "application/json"}
+        headers = {
+            "Content-Type": "application/json",
+            "Accept": "application/json",
+            "User-Agent": "MiaoMiaoTrader/1.0",
+        }
         if self._config.trade_mode == "demo":
             headers["x-simulated-trading"] = "1"
         body_str = json.dumps(body) if body else ""

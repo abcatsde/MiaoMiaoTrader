@@ -72,6 +72,11 @@ class AppConfig(BaseModel):
     task_context: str | None = None
     loop_interval_sec: int = 60
     web_port: int = 8088
+    log_lang: str = "zh"
+
+
+class UiConfig(BaseModel):
+    log_lang: str = "zh"
 
 
 @dataclass
@@ -128,6 +133,7 @@ def _save_config(config: AppConfig) -> None:
                 "task_context": config.task_context,
                 "loop_interval_sec": config.loop_interval_sec,
                 "llm_timeout_sec": config.llm_timeout_sec,
+                "log_lang": config.log_lang,
             },
             indent=2,
         ),
@@ -175,6 +181,23 @@ def get_config(x_access_token: str | None = Header(default=None)) -> JSONRespons
     return JSONResponse(content=config.model_dump())
 
 
+@app.get("/api/ui")
+def get_ui_config(x_access_token: str | None = Header(default=None)) -> JSONResponse:
+    _require_token(x_access_token)
+    config = _load_config()
+    return JSONResponse(content=UiConfig(log_lang=config.log_lang).model_dump())
+
+
+@app.post("/api/ui")
+def set_ui_config(payload: Dict[str, Any], x_access_token: str | None = Header(default=None)) -> JSONResponse:
+    _require_token(x_access_token)
+    ui = UiConfig.model_validate(payload)
+    config = _load_config()
+    config.log_lang = ui.log_lang
+    _save_config(config)
+    return JSONResponse(content={"ok": True})
+
+
 @app.post("/api/config")
 def set_config(payload: Dict[str, Any], x_access_token: str | None = Header(default=None)) -> JSONResponse:
     _require_token(x_access_token)
@@ -203,3 +226,17 @@ def stats(x_access_token: str | None = Header(default=None)) -> JSONResponse:
     _require_token(x_access_token)
     monitoring = MonitoringClient()
     return JSONResponse(content=monitoring.get_stats())
+
+
+@app.get("/api/events")
+def events(limit: int = 50, x_access_token: str | None = Header(default=None)) -> JSONResponse:
+    _require_token(x_access_token)
+    monitoring = MonitoringClient()
+    return JSONResponse(content={"events": monitoring.get_recent_events(limit=limit)})
+
+
+@app.get("/api/alerts")
+def alerts(limit: int = 20, x_access_token: str | None = Header(default=None)) -> JSONResponse:
+    _require_token(x_access_token)
+    monitoring = MonitoringClient()
+    return JSONResponse(content={"alerts": monitoring.get_recent_alerts(limit=limit)})

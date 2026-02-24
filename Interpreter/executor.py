@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+import json
 from typing import Any, Callable, Dict, Iterable, Optional
 
 from Backtest import BacktestEngine
@@ -51,7 +52,8 @@ class Executor:
 
         for step in plan.steps:
             if self._monitoring:
-                self._monitoring.log_event(f"step.start:{step.step_id}:{step.action}")
+                start_detail = self._format_step_start(step, ctx)
+                self._monitoring.log_event(start_detail)
 
             handler = self._actions.get(step.action)
             if handler is None:
@@ -69,7 +71,8 @@ class Executor:
             self._apply_result(step, result, ctx)
 
             if self._monitoring:
-                self._monitoring.log_event(f"step.done:{step.step_id}:{step.action}")
+                done_detail = self._format_step_done(step, result, ctx)
+                self._monitoring.log_event(done_detail)
 
             if ctx.errors:
                 break
@@ -80,6 +83,46 @@ class Executor:
         if self._memory:
             self._update_memory(ctx)
         return ExecutionResult(success=success, context=ctx)
+
+    def _format_step_start(self, step: PlanStep, ctx: ExecutionContext) -> str:
+        inputs = self._resolve_inputs(step, ctx)
+        inputs_text = self._format_kv(inputs)
+        reasoning = f" | rationale={self._truncate(step.reasoning)}" if step.reasoning else ""
+        title = self._truncate(step.title)
+        return f"step.start:{step.step_id}:{step.action} | title={title}{reasoning} | inputs={inputs_text}"
+
+    def _format_step_done(self, step: PlanStep, result: dict[str, Any], ctx: ExecutionContext) -> str:
+        outputs = result.get("outputs")
+        outputs_text = self._format_kv(outputs) if isinstance(outputs, dict) else self._truncate(outputs)
+        obs = result.get("observations")
+        dec = result.get("decisions")
+        err = result.get("errors")
+        parts = [f"step.done:{step.step_id}:{step.action}"]
+        if outputs is not None:
+            parts.append(f"outputs={outputs_text}")
+        if obs:
+            parts.append(f"observations={self._truncate(obs)}")
+        if dec:
+            parts.append(f"decisions={self._truncate(dec)}")
+        if err:
+            parts.append(f"errors={self._truncate(err)}")
+        return " | ".join(parts)
+
+    def _format_kv(self, payload: Any, limit: int = 6) -> str:
+        if not isinstance(payload, dict):
+            return self._truncate(payload)
+        items = list(payload.items())[:limit]
+        return "; ".join(f"{k}={self._truncate(v)}" for k, v in items)
+
+    def _truncate(self, value: Any, max_len: int = 300) -> str:
+        if isinstance(value, (dict, list, tuple)):
+            try:
+                text = json.dumps(value, ensure_ascii=False, default=str)
+            except Exception:
+                text = str(value)
+        else:
+            text = str(value)
+        return text if len(text) <= max_len else text[:max_len] + "..."
 
     def _resolve_inputs(self, step: PlanStep, ctx: ExecutionContext) -> dict[str, Any]:
         resolved: dict[str, Any] = {}

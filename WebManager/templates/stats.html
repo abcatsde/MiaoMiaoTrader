@@ -36,7 +36,7 @@
             <button class="btn" onclick="loadStats()">刷新统计</button>
             <div class="stats-grid">
               <div class="stat-item">
-                <div class="muted">已请求次数</div>
+                <div class="muted">LLM 成功请求数</div>
                 <div id="statRequests" class="stat-value">-</div>
               </div>
               <div class="stat-item">
@@ -47,9 +47,32 @@
                 <div class="muted">浮动盈亏</div>
                 <div id="statPnl" class="stat-value">-</div>
               </div>
-              <div class="stat-item">
-                <div class="muted">当前持仓</div>
-                <div id="statPositions" class="stat-value">-</div>
+            </div>
+            <div class="stat-item stat-wide">
+              <div class="muted">当前持仓</div>
+              <div id="statPositions" class="stat-value stat-list">-</div>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="title-sm">运行日志</div>
+                <div class="subtitle">最近事件与告警</div>
+              </div>
+              <div class="btn-row">
+                <button id="logLangBtn" class="btn btn-ghost" onclick="toggleLogLang()">日志：中文</button>
+                <button class="btn" onclick="loadLogs()">刷新日志</button>
+              </div>
+            </div>
+            <div class="log-grid">
+              <div>
+                <div class="muted">事件</div>
+                <div id="eventList" class="log-list"></div>
+              </div>
+              <div>
+                <div class="muted">告警</div>
+                <div id="alertList" class="log-list"></div>
               </div>
             </div>
           </div>

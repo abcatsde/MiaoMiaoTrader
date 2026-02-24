@@ -136,7 +136,8 @@ class Planner:
         )
         return (
             "You are a trading assistant planner. "
-            "Return an ordered list of steps, each with: title, action, inputs, outputs. "
+            "Return an ordered list of steps, each with: title, action, inputs, outputs, and a brief rationale. "
+            "Rationale must be short (<= 20 words) and can include a stance like bullish/bearish/neutral. "
             "Use concise steps and no more than the max steps."
             f"\nGoal: {task.goal}"
             f"{context_block}"
@@ -145,9 +146,9 @@ class Planner:
             f"{behavior_block}"
             f"{policy_block}"
             "\nPreferred JSON format:\n"
-            '{"steps":[{"title":"...","action":"...","inputs":{...},"outputs":[...]}]}\n'
+            '{"steps":[{"title":"...","action":"...","inputs":{...},"outputs":[...],"rationale":"...","stance":"neutral"}]}\n'
             "Fallback text format:\n"
-            "1. Title | Action | Inputs=k:v;... | Outputs=a,b,c\n"
+            "1. Title | Action | Inputs=k:v;... | Outputs=a,b,c | Rationale=... | Stance=neutral\n"
         )
 
     def _build_memory_context(self) -> str:
@@ -237,11 +238,19 @@ class Planner:
             action = parts[1]
             inputs = self._parse_kv(parts[2]) if len(parts) > 2 else {}
             outputs = self._parse_list(parts[3]) if len(parts) > 3 else []
+            rationale = None
+            if len(parts) > 4:
+                rationale = self._strip_prefix(parts[4], ["Rationale=", "理由="])
+            if len(parts) > 5:
+                stance = self._strip_prefix(parts[5], ["Stance=", "态度="])
+                if stance:
+                    rationale = f"{rationale or ''} stance={stance}".strip()
             steps.append(
                 PlanStep(
                     step_id=len(steps) + 1,
                     title=title,
                     action=action,
+                    reasoning=rationale,
                     inputs=inputs,
                     outputs=outputs,
                 )
@@ -278,6 +287,10 @@ class Planner:
                 continue
             inputs = item.get("inputs") or item.get("args") or {}
             outputs = item.get("outputs") or item.get("return") or []
+            rationale = item.get("rationale") or item.get("reasoning") or item.get("decision")
+            stance = item.get("stance") or item.get("attitude")
+            if stance:
+                rationale = f"{rationale or ''} stance={stance}".strip()
             if not isinstance(inputs, dict):
                 inputs = {}
             if isinstance(outputs, str):
@@ -290,6 +303,7 @@ class Planner:
                     step_id=len(steps) + 1,
                     title=str(title),
                     action=str(action),
+                    reasoning=str(rationale) if rationale else None,
                     inputs={str(k): str(v) for k, v in inputs.items()},
                     outputs=[str(x) for x in outputs],
                 )
@@ -339,6 +353,13 @@ class Planner:
         else:
             payload = segment
         return [item.strip() for item in payload.split(",") if item.strip()]
+
+    def _strip_prefix(self, text: str, prefixes: list[str]) -> str:
+        value = text.strip()
+        for prefix in prefixes:
+            if value.startswith(prefix):
+                return value[len(prefix):].strip()
+        return value
 
     def _fallback_plan(self, task: Task) -> Sequence[PlanStep]:
         goal = task.goal.lower()

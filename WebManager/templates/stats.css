@@ -20,11 +20,15 @@ body {
 .container { max-width: 900px; margin: 24px auto 64px; padding: 0 16px; }
 .header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 16px; gap: 16px; flex-wrap: wrap; }
 .title { font-size: 22px; font-weight: 700; }
+.title-sm { font-size: 16px; font-weight: 700; }
 .subtitle { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .card { background: var(--card); border: 1px solid var(--border); border-radius: 12px; padding: 16px; }
+.card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
 .btn { padding: 10px 14px; border-radius: 8px; border: 1px solid transparent; background: var(--primary); color: white; cursor: pointer; font-weight: 600; text-decoration: none; transition: transform 0.12s ease, background 0.15s ease; }
 .btn:hover { background: var(--primary-2); transform: translateY(-1px); }
 .btn:active { transform: translateY(0); }
+.btn-ghost { background: transparent; border-color: var(--border); }
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
 .row { margin-bottom: 12px; }
 .muted { color: var(--muted); font-size: 12px; }
 .hidden { display: none; }
@@ -74,14 +78,46 @@ input:focus { outline: none; border-color: #5f78ff; box-shadow: 0 0 0 3px var(--
   border-radius: 10px;
   padding: 12px;
 }
+.stat-wide { margin-top: 12px; }
 .stat-value {
   font-size: 20px;
   font-weight: 700;
   margin-top: 6px;
 }
+.stat-list {
+  font-size: 14px;
+  font-weight: 600;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.log-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+.log-list {
+  margin-top: 8px;
+  background: #12151c;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  max-height: 320px;
+  overflow: auto;
+  font-size: 12px;
+}
+.log-item {
+  padding: 6px 4px;
+  border-bottom: 1px dashed #242a36;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+.log-item:last-child { border-bottom: none; }
+.log-empty { padding: 12px 4px; }
 
 @media (max-width: 640px) {
   .stats-grid { grid-template-columns: 1fr; }
+  .log-grid { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 960px) {
