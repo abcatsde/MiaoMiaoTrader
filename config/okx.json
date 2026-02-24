@@ -1,0 +1,13 @@
+{
+  "okx": {
+    "api_key": "",
+    "api_secret": "",
+    "passphrase": "",
+    "base_url": "https://www.okx.com",
+    "trade_mode": "real",
+    "we_enabled": false,
+    "ws_enabled": false,
+    "ws_url": "wss://ws.okx.com:8443/ws/v5/business",
+    "ws_channels": ["deposit-info", "withdrawal-info"]
+  }
+}

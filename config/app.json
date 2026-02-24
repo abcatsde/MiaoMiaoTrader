@@ -1,0 +1,25 @@
+{
+  "trading_preferences": {
+    "timeframe": "15m",
+    "max_pairs": 2,
+    "max_timeframes": 2,
+    "margin_mode": "isolated",
+    "universe": {
+      "mainstream": true,
+      "alt": false
+    },
+    "horizon": {
+      "scalp": false,
+      "intraday": true,
+      "swing": false
+    },
+    "market": {
+      "spot": true,
+      "derivatives": false
+    }
+  },
+  "task_goal": "基于 15m 日内策略观察 1-2 个币对，必要时设置价格预警",
+  "task_context": "默认日内观察",
+  "loop_interval_sec": 60,
+  "web_port": 8088
+}

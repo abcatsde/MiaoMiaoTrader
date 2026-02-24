@@ -1,0 +1,12 @@
+{
+  "llm_providers": [
+    {
+      "name": "openai",
+      "endpoint": "https://api.openai.com/v1",
+      "api_key": "",
+      "model": "gpt-4o-mini",
+      "enabled": true,
+      "weight": 1
+    }
+  ]
+}

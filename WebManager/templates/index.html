@@ -1,0 +1,475 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>MiaoMiaoTrader Manager</title>
+    <style>
+      :root {
+        --bg: #0f1115;
+        --card: #171a21;
+        --muted: #9aa3b2;
+        --text: #e6e9ef;
+        --primary: #6c8cff;
+        --primary-2: #4c6fff;
+        --danger: #ff6b6b;
+        --border: #2a2f3a;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
+        background: var(--bg);
+        color: var(--text);
+      }
+      .container {
+        max-width: 1100px;
+        margin: 24px auto 64px;
+        padding: 0 16px;
+      }
+      .center {
+        min-height: 100vh;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+      }
+      .login-card {
+        width: 420px;
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 16px;
+        padding: 28px;
+        box-shadow: 0 12px 32px rgba(0,0,0,0.35);
+      }
+      .login-title {
+        font-size: 20px;
+        font-weight: 700;
+        margin-bottom: 8px;
+      }
+      .login-desc { color: var(--muted); font-size: 12px; margin-bottom: 16px; }
+      .header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        margin-bottom: 16px;
+      }
+      .title {
+        font-size: 24px;
+        font-weight: 700;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: 1.2fr 1fr;
+        gap: 16px;
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 16px;
+      }
+      .card h3 { margin: 0 0 12px; }
+      .row { margin-bottom: 12px; }
+      label { display: block; margin-bottom: 6px; color: var(--muted); font-size: 12px; }
+      input, textarea, select {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--border);
+        background: #0f1218;
+        color: var(--text);
+      }
+      textarea { min-height: 200px; }
+      .btn {
+        padding: 10px 14px;
+        border-radius: 8px;
+        border: 1px solid transparent;
+        background: var(--primary);
+        color: white;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      .btn:hover { background: var(--primary-2); }
+      .btn-ghost { background: transparent; border-color: var(--border); }
+      .btn-danger { background: var(--danger); }
+      .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+      .llm-list { display: flex; flex-direction: column; gap: 10px; }
+      .llm-item {
+        display: grid;
+        grid-template-columns: 28px 1fr 1fr 1fr 120px 80px 44px;
+        gap: 8px;
+        align-items: center;
+        padding: 10px;
+        border: 1px dashed var(--border);
+        border-radius: 10px;
+        background: #12151c;
+      }
+      .drag {
+        cursor: grab;
+        font-size: 18px;
+        color: var(--muted);
+        text-align: center;
+      }
+      .pill { font-size: 12px; color: var(--muted); }
+      .muted { color: var(--muted); font-size: 12px; }
+      .split { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .footer { margin-top: 16px; font-size: 12px; color: var(--muted); }
+      .hidden { display: none; }
+      .badge { font-size: 12px; color: var(--muted); }
+      @media (max-width: 960px) {
+        .grid { grid-template-columns: 1fr; }
+        .llm-item { grid-template-columns: 28px 1fr; }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="loginView" class="center">
+      <div class="login-card">
+        <div class="login-title">MiaoMiaoTrader 登录</div>
+        <div class="login-desc">输入启动日志中的 Token 后进入管理页面</div>
+        <div class="row">
+          <label>Access Token</label>
+          <input id="token" placeholder="启动日志里看到的 token" />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="login()">登录</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="appView" class="container hidden">
+      <div class="header">
+        <div class="title">MiaoMiaoTrader Manager</div>
+        <div class="btn-row">
+          <button class="btn btn-ghost" onclick="loadConfig()">加载</button>
+          <button class="btn" onclick="saveConfig()">保存</button>
+          <button class="btn btn-danger" onclick="restartApp()">重启服务</button>
+        </div>
+      </div>
+
+      <div class="grid">
+        <div class="card">
+          <h3>访问 Token</h3>
+          <div class="row">
+            <label>Access Token</label>
+            <input id="tokenDisplay" disabled />
+          </div>
+          <div class="row">
+            <label>Web 端口</label>
+            <input id="webPort" type="number" min="1" max="65535" />
+          </div>
+
+          <h3>LLM 模型列表</h3>
+          <div class="row btn-row">
+            <button class="btn" onclick="addOpenAIProvider()">添加 OpenAI 格式</button>
+            <button class="btn btn-ghost" onclick="addEmptyProvider()">添加空白</button>
+          </div>
+          <div class="llm-list" id="llmList"></div>
+          <div class="footer">拖动左侧图标调整优先级（靠前优先）。</div>
+        </div>
+
+        <div class="card">
+          <h3>运行统计</h3>
+          <div class="row btn-row">
+            <button class="btn btn-ghost" onclick="loadStats()">刷新统计</button>
+          </div>
+          <div class="row">
+            <div class="muted">已请求次数</div>
+            <div id="statRequests">-</div>
+          </div>
+          <div class="row">
+            <div class="muted">交易单数</div>
+            <div id="statTrades">-</div>
+          </div>
+          <div class="row">
+            <div class="muted">浮动盈亏</div>
+            <div id="statPnl">-</div>
+          </div>
+          <div class="row">
+            <div class="muted">当前持仓</div>
+            <div id="statPositions">-</div>
+          </div>
+
+          <h3>交易偏好</h3>
+          <div class="split">
+            <div class="row">
+              <label>时间级别</label>
+              <input id="prefTimeframe" placeholder="15m" />
+            </div>
+            <div class="row">
+              <label>最大币对数</label>
+              <input id="prefMaxPairs" type="number" min="1" />
+            </div>
+            <div class="row">
+              <label>最大级别数</label>
+              <input id="prefMaxTF" type="number" min="1" />
+            </div>
+            <div class="row">
+              <label>默认保证金模式</label>
+              <select id="prefMarginMode">
+                <option value="isolated">isolated（逐仓）</option>
+                <option value="cross">cross（全仓）</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="row">
+            <label>交易选项</label>
+            <div class="split">
+              <div>
+                <div class="pill">币种范围</div>
+                <label><input type="checkbox" id="optMainstream" /> 主流币</label>
+                <label><input type="checkbox" id="optAlt" /> 山寨币</label>
+              </div>
+              <div>
+                <div class="pill">交易周期</div>
+                <label><input type="checkbox" id="optScalp" /> 短线</label>
+                <label><input type="checkbox" id="optIntraday" /> 日内</label>
+                <label><input type="checkbox" id="optSwing" /> 中长线</label>
+              </div>
+              <div>
+                <div class="pill">交易市场</div>
+                <label><input type="checkbox" id="optSpot" /> 现货</label>
+                <label><input type="checkbox" id="optDeriv" /> 合约</label>
+              </div>
+            </div>
+          </div>
+
+          <h3>OKX 配置</h3>
+          <div class="row">
+            <label>Base URL</label>
+            <input id="okxBaseUrl" placeholder="https://www.okx.com" />
+          </div>
+          <div class="row">
+            <label>交易模式</label>
+            <select id="okxTradeMode">
+              <option value="real">实盘</option>
+              <option value="demo">模拟盘</option>
+            </select>
+          </div>
+          <div class="row">
+            <label>API Key</label>
+            <input id="okxKey" placeholder="" />
+          </div>
+          <div class="row">
+            <label>API Secret</label>
+            <input id="okxSecret" placeholder="" />
+          </div>
+          <div class="row">
+            <label>Passphrase</label>
+            <input id="okxPass" placeholder="" />
+          </div>
+          <div class="row">
+            <label><input type="checkbox" id="okxWeEnabled" /> 启用 WebSocket（we_enabled）</label>
+          </div>
+
+          <h3>原始配置</h3>
+          <textarea id="configRaw"></textarea>
+          <div class="muted">可在此直接编辑 JSON。保存时会优先使用当前表单数据。</div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let accessToken = '';
+      let state = {
+        llm_providers: [],
+        trading_preferences: { timeframe: '15m', max_pairs: 2, max_timeframes: 2, margin_mode: 'isolated' },
+        okx: { api_key: '', api_secret: '', passphrase: '', base_url: 'https://www.okx.com' }
+      };
+
+      function login() {
+        const token = document.getElementById('token').value.trim();
+        if (!token) return;
+        accessToken = token;
+        document.getElementById('tokenDisplay').value = token;
+        document.getElementById('loginView').classList.add('hidden');
+        document.getElementById('appView').classList.remove('hidden');
+        loadConfig();
+        loadStats();
+      }
+
+      function renderLLMList() {
+        const list = document.getElementById('llmList');
+        list.innerHTML = '';
+        state.llm_providers.forEach((p, idx) => {
+          const item = document.createElement('div');
+          item.className = 'llm-item';
+          item.draggable = true;
+          item.dataset.index = String(idx);
+          item.innerHTML = `
+            <div class="drag">☰</div>
+            <input placeholder="name" value="${p.name || ''}" data-field="name" />
+            <input placeholder="endpoint" value="${p.endpoint || ''}" data-field="endpoint" />
+            <input placeholder="api_key" value="${p.api_key || ''}" data-field="api_key" />
+            <input placeholder="model" value="${p.model || ''}" data-field="model" />
+            <select data-field="enabled">
+              <option value="true" ${p.enabled ? 'selected' : ''}>启用</option>
+              <option value="false" ${!p.enabled ? 'selected' : ''}>停用</option>
+            </select>
+            <button class="btn btn-danger" onclick="removeProvider(${idx})">删</button>
+          `;
+
+          item.addEventListener('input', (e) => {
+            const target = e.target;
+            if (!target || !target.dataset.field) return;
+            const field = target.dataset.field;
+            if (field === 'enabled') {
+              state.llm_providers[idx][field] = target.value === 'true';
+            } else {
+              state.llm_providers[idx][field] = target.value;
+            }
+            syncRaw();
+          });
+
+          item.addEventListener('dragstart', (e) => {
+            e.dataTransfer.setData('text/plain', item.dataset.index);
+          });
+          item.addEventListener('dragover', (e) => e.preventDefault());
+          item.addEventListener('drop', (e) => {
+            e.preventDefault();
+            const from = Number(e.dataTransfer.getData('text/plain'));
+            const to = Number(item.dataset.index);
+            if (Number.isNaN(from) || Number.isNaN(to) || from === to) return;
+            const moved = state.llm_providers.splice(from, 1)[0];
+            state.llm_providers.splice(to, 0, moved);
+            renderLLMList();
+            syncRaw();
+          });
+
+          list.appendChild(item);
+        });
+      }
+
+      function addOpenAIProvider() {
+        state.llm_providers.push({
+          name: 'openai',
+          endpoint: 'https://api.openai.com/v1',
+          api_key: '',
+          model: 'gpt-4o-mini',
+          enabled: true,
+          weight: 1
+        });
+        renderLLMList();
+        syncRaw();
+      }
+
+      function addEmptyProvider() {
+        state.llm_providers.push({ name: '', endpoint: '', api_key: '', model: '', enabled: true, weight: 1 });
+        renderLLMList();
+        syncRaw();
+      }
+
+      function removeProvider(index) {
+        state.llm_providers.splice(index, 1);
+        renderLLMList();
+        syncRaw();
+      }
+
+      function syncRaw() {
+        document.getElementById('configRaw').value = JSON.stringify(state, null, 2);
+      }
+
+      function syncFormToState() {
+        state.trading_preferences = {
+          timeframe: document.getElementById('prefTimeframe').value || '15m',
+          max_pairs: Number(document.getElementById('prefMaxPairs').value || 2),
+          max_timeframes: Number(document.getElementById('prefMaxTF').value || 2),
+          margin_mode: document.getElementById('prefMarginMode').value || 'isolated',
+          universe: {
+            mainstream: document.getElementById('optMainstream').checked,
+            alt: document.getElementById('optAlt').checked
+          },
+          horizon: {
+            scalp: document.getElementById('optScalp').checked,
+            intraday: document.getElementById('optIntraday').checked,
+            swing: document.getElementById('optSwing').checked
+          },
+          market: {
+            spot: document.getElementById('optSpot').checked,
+            derivatives: document.getElementById('optDeriv').checked
+          }
+        };
+        state.okx = {
+          base_url: document.getElementById('okxBaseUrl').value || 'https://www.okx.com',
+          api_key: document.getElementById('okxKey').value || '',
+          api_secret: document.getElementById('okxSecret').value || '',
+          passphrase: document.getElementById('okxPass').value || '',
+          trade_mode: document.getElementById('okxTradeMode').value || 'real',
+          we_enabled: document.getElementById('okxWeEnabled').checked
+        };
+        state.web_port = Number(document.getElementById('webPort').value || 8088);
+      }
+
+      function syncStateToForm() {
+        document.getElementById('prefTimeframe').value = state.trading_preferences?.timeframe || '15m';
+        document.getElementById('prefMaxPairs').value = state.trading_preferences?.max_pairs ?? 2;
+        document.getElementById('prefMaxTF').value = state.trading_preferences?.max_timeframes ?? 2;
+        document.getElementById('prefMarginMode').value = state.trading_preferences?.margin_mode || 'isolated';
+        document.getElementById('optMainstream').checked = !!state.trading_preferences?.universe?.mainstream;
+        document.getElementById('optAlt').checked = !!state.trading_preferences?.universe?.alt;
+        document.getElementById('optScalp').checked = !!state.trading_preferences?.horizon?.scalp;
+        document.getElementById('optIntraday').checked = !!state.trading_preferences?.horizon?.intraday;
+        document.getElementById('optSwing').checked = !!state.trading_preferences?.horizon?.swing;
+        document.getElementById('optSpot').checked = !!state.trading_preferences?.market?.spot;
+        document.getElementById('optDeriv').checked = !!state.trading_preferences?.market?.derivatives;
+        document.getElementById('okxBaseUrl').value = state.okx?.base_url || 'https://www.okx.com';
+        document.getElementById('okxKey').value = state.okx?.api_key || '';
+        document.getElementById('okxSecret').value = state.okx?.api_secret || '';
+        document.getElementById('okxPass').value = state.okx?.passphrase || '';
+        document.getElementById('okxTradeMode').value = state.okx?.trade_mode || 'real';
+        document.getElementById('okxWeEnabled').checked = !!state.okx?.we_enabled;
+        document.getElementById('webPort').value = state.web_port ?? 8088;
+        syncRaw();
+        renderLLMList();
+      }
+
+      async function loadConfig() {
+        const res = await fetch('/api/config', { headers: { 'X-Access-Token': accessToken }});
+        const data = await res.json();
+        state = data;
+        syncStateToForm();
+      }
+
+      async function saveConfig() {
+        syncFormToState();
+        const res = await fetch('/api/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Access-Token': accessToken },
+          body: JSON.stringify(state)
+        });
+        const data = await res.json();
+        alert(JSON.stringify(data));
+      }
+
+      async function restartApp() {
+        const res = await fetch('/api/restart', {
+          method: 'POST',
+          headers: { 'X-Access-Token': accessToken }
+        });
+        const data = await res.json();
+        alert(JSON.stringify(data));
+      }
+
+      async function loadStats() {
+        const res = await fetch('/api/stats', { headers: { 'X-Access-Token': accessToken }});
+        const data = await res.json();
+        const req = data.request_count?.value ?? '0';
+        const trades = data.trade_count?.value ?? '0';
+        const pnl = data.pnl_unrealized?.value ?? '0';
+        const positions = data.current_positions?.value ?? '[]';
+        document.getElementById('statRequests').innerText = req;
+        document.getElementById('statTrades').innerText = trades;
+        document.getElementById('statPnl').innerText = pnl;
+        document.getElementById('statPositions').innerText = positions;
+      }
+
+      document.getElementById('configRaw').addEventListener('input', (e) => {
+        try {
+          const parsed = JSON.parse(e.target.value);
+          state = parsed;
+          syncStateToForm();
+        } catch (_e) {}
+      });
+    </script>
+  </body>
+</html>
