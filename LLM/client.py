@@ -41,7 +41,7 @@ class LLMClient:
                     return provider.generate(prompt)
                 except Exception as exc:  # noqa: BLE001
                     last_error = exc
-                    logger.warning(
+                    logger.debug(
                         "LLM generate failed (provider %s, attempt %s/%s): %s",
                         provider.name,
                         attempt,
@@ -52,4 +52,5 @@ class LLMClient:
                 "LLM provider %s exhausted retries, switching to next provider.",
                 provider.name,
             )
+        logger.warning("LLM请求失败，已重试仍失败。")
         raise RuntimeError("LLM generate failed after retries.") from last_error

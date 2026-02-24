@@ -49,6 +49,11 @@
           </div>
 
           <div class="card">
+            <div class="row">
+              <label>LLM 请求超时（秒）</label>
+              <input id="llmTimeoutSec" type="number" min="1" max="600" placeholder="30" />
+              <div class="muted">示例：120 表示单次请求最多等待 120 秒。</div>
+            </div>
             <div class="row btn-row">
               <button class="btn" onclick="openProviderModal()">添加 LLM 模型</button>
               <button class="btn btn-ghost" onclick="addEmptyProvider()">添加空白</button>

@@ -1,6 +1,7 @@
 let accessToken = '';
 let state = {
   llm_providers: [],
+  llm_timeout_sec: 30,
   trading_preferences: { timeframe: '15m', max_pairs: 2, max_timeframes: 2, margin_mode: 'isolated' },
   okx: { api_key: '', api_secret: '', passphrase: '', base_url: 'https://www.okx.com' }
 };

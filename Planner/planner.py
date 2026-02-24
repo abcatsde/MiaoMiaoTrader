@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
+import json
 import logging
 from typing import List, Optional, Sequence
 
@@ -143,7 +144,9 @@ class Planner:
             f"{actions_block}"
             f"{behavior_block}"
             f"{policy_block}"
-            "\nFormat:\n"
+            "\nPreferred JSON format:\n"
+            '{"steps":[{"title":"...","action":"...","inputs":{...},"outputs":[...]}]}\n'
+            "Fallback text format:\n"
             "1. Title | Action | Inputs=k:v;... | Outputs=a,b,c\n"
         )
 
@@ -219,6 +222,9 @@ class Planner:
         self._memory_client.apply_retention()
 
     def _parse_llm_output(self, raw: str) -> List[PlanStep]:
+        json_steps = self._parse_json_steps(raw)
+        if json_steps:
+            return json_steps
         steps: List[PlanStep] = []
         lines = [line.strip() for line in raw.splitlines() if line.strip()]
         for line in lines:
@@ -243,6 +249,76 @@ class Planner:
             if len(steps) >= self._config.max_steps:
                 break
         return steps
+
+    def _parse_json_steps(self, raw: str) -> list[PlanStep] | None:
+        payload = self._extract_json(raw)
+        if payload is None:
+            return None
+        try:
+            data = json.loads(payload)
+        except Exception:  # noqa: BLE001
+            return None
+
+        items = None
+        if isinstance(data, dict):
+            items = data.get("steps")
+        elif isinstance(data, list):
+            items = data
+
+        if not isinstance(items, list):
+            return None
+
+        steps: list[PlanStep] = []
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            action = item.get("action") or item.get("action_name") or item.get("tool")
+            title = item.get("title") or item.get("name") or "Step"
+            if not action:
+                continue
+            inputs = item.get("inputs") or item.get("args") or {}
+            outputs = item.get("outputs") or item.get("return") or []
+            if not isinstance(inputs, dict):
+                inputs = {}
+            if isinstance(outputs, str):
+                outputs = [outputs]
+            if not isinstance(outputs, list):
+                outputs = []
+
+            steps.append(
+                PlanStep(
+                    step_id=len(steps) + 1,
+                    title=str(title),
+                    action=str(action),
+                    inputs={str(k): str(v) for k, v in inputs.items()},
+                    outputs=[str(x) for x in outputs],
+                )
+            )
+            if len(steps) >= self._config.max_steps:
+                break
+        return steps or None
+
+    def _extract_json(self, raw: str) -> str | None:
+        text = raw.strip()
+        if not text:
+            return None
+        if text[0] in "[{":
+            end = "]" if text[0] == "[" else "}"
+            if text.endswith(end):
+                return text
+        first_obj = text.find("{")
+        first_arr = text.find("[")
+        if first_obj == -1 and first_arr == -1:
+            return None
+        if first_arr != -1 and (first_obj == -1 or first_arr < first_obj):
+            last = text.rfind("]")
+            if last != -1:
+                return text[first_arr:last + 1]
+        if first_obj != -1:
+            last = text.rfind("}")
+            if last != -1:
+                return text[first_obj:last + 1]
+        return None
 
     def _parse_kv(self, segment: str) -> dict[str, str]:
         if "=" not in segment:

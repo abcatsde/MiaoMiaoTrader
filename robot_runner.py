@@ -100,6 +100,7 @@ def _openai_generate(
 
 def _build_llm_client(config: dict) -> LLMClient:
     providers_cfg = config.get("llm_providers", [])
+    timeout = int(config.get("llm_timeout_sec", 30) or 30)
     providers: list[LLMProvider] = []
     for item in providers_cfg:
         if not item.get("enabled", True):
@@ -112,7 +113,7 @@ def _build_llm_client(config: dict) -> LLMClient:
             continue
 
         def _make(endpoint: str, api_key: str, model: str) -> Callable[[str], str]:
-            return lambda prompt: _openai_generate(endpoint, api_key, model, prompt)
+            return lambda prompt: _openai_generate(endpoint, api_key, model, prompt, timeout=timeout)
 
         providers.append(LLMProvider(name=name, generate=_make(endpoint, api_key, model)))
 
@@ -424,7 +425,19 @@ def run_robot() -> None:
             if sleep_active and has_positions:
                 context = f"Sleep mode active: {int(next_check_after - now)}s remaining.\n" + context
 
-            plan = planner.plan(Task(goal=goal, context=context))
+            try:
+                plan = planner.plan(Task(goal=goal, context=context))
+            except RuntimeError as exc:
+                message = str(exc)
+                if "No LLM providers configured" in message:
+                    logger.warning("LLM未配置大模型，请前往web端或config文件配置。")
+                elif "LLM generate failed" in message:
+                    logger.warning("LLM请求失败（可能是 endpoint 或 key 错误），稍后重试。")
+                else:
+                    logger.warning("LLM计划生成失败：%s", exc)
+                time.sleep(max(interval, 5))
+                continue
+
             result = executor.execute(plan)
             logger.info("Execution result: %s", result.success)
 
@@ -436,7 +449,7 @@ def run_robot() -> None:
                 continue
 
         except Exception as exc:  # noqa: BLE001
-            logger.exception("Robot loop error: %s", exc)
+            logger.error("Robot loop error: %s", exc)
             try:
                 _write_snapshot(
                     {

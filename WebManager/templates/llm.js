@@ -1,6 +1,7 @@
 let accessToken = '';
 let state = {
   llm_providers: [],
+  llm_timeout_sec: 30,
   trading_preferences: { timeframe: '15m', max_pairs: 2, max_timeframes: 2, margin_mode: 'isolated' },
   okx: { api_key: '', api_secret: '', passphrase: '', base_url: 'https://www.okx.com' }
 };
@@ -129,6 +130,8 @@ function syncRaw() {
 }
 
 function syncStateToForm() {
+  const timeoutInput = document.getElementById('llmTimeoutSec');
+  if (timeoutInput) timeoutInput.value = state.llm_timeout_sec ?? 30;
   renderLLMList();
 }
 
@@ -151,6 +154,10 @@ async function loadConfig() {
 async function saveConfig() {
   try {
     setStatus('保存中...', 'warn');
+    const timeoutInput = document.getElementById('llmTimeoutSec');
+    if (timeoutInput) {
+      state.llm_timeout_sec = Number(timeoutInput.value || 30);
+    }
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Access-Token': accessToken },

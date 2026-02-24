@@ -64,6 +64,7 @@ class OKXConfigModel(BaseModel):
 
 class AppConfig(BaseModel):
     llm_providers: List[LLMProviderItem] = Field(default_factory=list)
+    llm_timeout_sec: int = 30
     trading_preferences: TradingPreferences = Field(default_factory=TradingPreferences)
     okx: OKXConfigModel = Field(default_factory=OKXConfigModel)
     task_goal: str | None = None
@@ -119,6 +120,7 @@ def _save_config(config: AppConfig) -> None:
                 "task_goal": config.task_goal,
                 "task_context": config.task_context,
                 "loop_interval_sec": config.loop_interval_sec,
+                "llm_timeout_sec": config.llm_timeout_sec,
             },
             indent=2,
         ),

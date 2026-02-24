@@ -44,6 +44,10 @@ WorkingDirectory=/path/to/MiaoMiaoTrader
 ExecStart=/usr/bin/python3 /path/to/MiaoMiaoTrader/start.py
 Restart=always
 RestartSec=5
+Environment=PYTHONUNBUFFERED=1
+Environment=FORCE_COLOR=1
+Environment=CLICOLOR=1
+Environment=SYSTEMD_COLORS=1
 
 [Install]
 WantedBy=multi-user.target
@@ -66,7 +70,7 @@ sudo systemctl stop miaomiao-trader
 查看日志：
 
 ```
-journalctl -u miaomiao-trader -f
+journalctl -u miaomiao-trader -f -o cat --no-pager
 ```
 
 ## 日志
