@@ -65,6 +65,7 @@ class OKXConfigModel(BaseModel):
 
 class AppConfig(BaseModel):
     llm_providers: List[LLMProviderItem] = Field(default_factory=list)
+    log_llm_provider: LLMProviderItem | None = None
     llm_timeout_sec: int = 30
     trading_preferences: TradingPreferences = Field(default_factory=TradingPreferences)
     okx: OKXConfigModel = Field(default_factory=OKXConfigModel)
@@ -99,9 +100,9 @@ app.mount("/static", StaticFiles(directory=str(BASE_DIR / "templates")), name="s
 
 @app.on_event("startup")
 def _print_token() -> None:
-    logger.info("==========")
+    logger.info("==========================================")
     logger.info("WebManager Access token: %s", TOKEN_STATE.token)
-    logger.info("==========")
+    logger.info("==========================================")
 
 
 def _load_config() -> AppConfig:
@@ -118,6 +119,7 @@ def _load_config() -> AppConfig:
     data = {
         **app_data,
         "llm_providers": llm_data.get("llm_providers", app_data.get("llm_providers", [])),
+        "log_llm_provider": llm_data.get("log_llm_provider", app_data.get("log_llm_provider")),
         "okx": okx_data.get("okx", app_data.get("okx", {})),
     }
     return AppConfig.model_validate(data)
@@ -140,7 +142,13 @@ def _save_config(config: AppConfig) -> None:
         encoding="utf-8",
     )
     LLM_CONFIG_PATH.write_text(
-        json.dumps({"llm_providers": [p.model_dump() for p in config.llm_providers]}, indent=2),
+        json.dumps(
+            {
+                "llm_providers": [p.model_dump() for p in config.llm_providers],
+                "log_llm_provider": config.log_llm_provider.model_dump() if config.log_llm_provider else None,
+            },
+            indent=2,
+        ),
         encoding="utf-8",
     )
     OKX_CONFIG_PATH.write_text(

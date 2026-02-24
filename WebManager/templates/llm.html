@@ -61,6 +61,36 @@
             <div class="llm-list" id="llmList"></div>
             <div class="footer">支持多模型容错与轮换，建议至少配置 2 个模型。</div>
           </div>
+
+          <div class="card">
+            <div class="card-header">
+              <h3>日志 LLM</h3>
+              <div class="card-subtitle">用于将规划 JSON 解读为自然播报</div>
+            </div>
+            <div class="row">
+              <label>启用</label>
+              <select id="logLlmEnabled">
+                <option value="true">启用</option>
+                <option value="false">停用</option>
+              </select>
+            </div>
+            <div class="row">
+              <label>名称</label>
+              <input id="logLlmName" placeholder="log-llm" />
+            </div>
+            <div class="row">
+              <label>API 地址</label>
+              <input id="logLlmEndpoint" placeholder="https://api.openai.com/v1" />
+            </div>
+            <div class="row">
+              <label>API Key</label>
+              <input id="logLlmKey" placeholder="sk-..." />
+            </div>
+            <div class="row">
+              <label>模型</label>
+              <input id="logLlmModel" placeholder="gpt-4o-mini" />
+            </div>
+          </div>
         </main>
       </div>
     </div>

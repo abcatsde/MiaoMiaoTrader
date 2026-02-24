@@ -69,11 +69,13 @@ class Planner:
     def __init__(
         self,
         llm_client: Optional[LLMClient] = None,
+        log_llm_client: Optional[LLMClient] = None,
         memory_client: Optional[MemoryClient] = None,
         monitoring_client: Optional[MonitoringClient] = None,
         config: Optional[PlannerConfig] = None,
     ) -> None:
         self._llm_client = llm_client
+        self._log_llm_client = log_llm_client
         self._memory_client = memory_client
         self._monitoring_client = monitoring_client
         self._config = config or PlannerConfig()
@@ -92,7 +94,24 @@ class Planner:
         if self._monitoring_client:
             self._monitoring_client.log_event("plan.created", level="INFO")
             self._monitoring_client.log_metric("plan.steps", len(plan.steps))
+        self._emit_log_narration(plan, raw)
         return plan
+
+    def _emit_log_narration(self, plan: Plan, raw: str) -> None:
+        if not self._log_llm_client or not self._monitoring_client:
+            return
+        try:
+            prompt = (
+                "你是交易机器人播报员。请阅读规划输出，并用自然中文播报接下来要做的步骤。"
+                "要求：1-3 句话，简洁清晰，避免技术字段名；若步骤里包含观察/理由，可自然提及。"
+                "\n规划 JSON：\n"
+                f"{raw}\n"
+            )
+            narration = self._log_llm_client.generate(prompt).strip()
+            if narration:
+                self._monitoring_client.log_event(f"plan.narration: {narration}", level="INFO")
+        except Exception:  # noqa: BLE001
+            return
 
     def _build_prompt(self, task: Task) -> str:
         context_block = f"\nContext:\n{task.context}\n" if task.context else ""

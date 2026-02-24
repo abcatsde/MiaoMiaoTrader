@@ -2,6 +2,7 @@ let accessToken = '';
 let autoLoginBlocked = false;
 let state = {
   llm_providers: [],
+  log_llm_provider: null,
   llm_timeout_sec: 30,
   trading_preferences: { timeframe: '15m', max_pairs: 2, max_timeframes: 2, margin_mode: 'isolated' },
   okx: { api_key: '', api_secret: '', passphrase: '', base_url: 'https://www.okx.com' }
@@ -145,6 +146,17 @@ function syncRaw() {
 function syncStateToForm() {
   const timeoutInput = document.getElementById('llmTimeoutSec');
   if (timeoutInput) timeoutInput.value = state.llm_timeout_sec ?? 30;
+  const logEnabled = document.getElementById('logLlmEnabled');
+  const logName = document.getElementById('logLlmName');
+  const logEndpoint = document.getElementById('logLlmEndpoint');
+  const logKey = document.getElementById('logLlmKey');
+  const logModel = document.getElementById('logLlmModel');
+  const logCfg = state.log_llm_provider || {};
+  if (logEnabled) logEnabled.value = logCfg.enabled === false ? 'false' : 'true';
+  if (logName) logName.value = logCfg.name || '';
+  if (logEndpoint) logEndpoint.value = logCfg.endpoint || '';
+  if (logKey) logKey.value = logCfg.api_key || '';
+  if (logModel) logModel.value = logCfg.model || '';
   renderLLMList();
 }
 
@@ -172,6 +184,18 @@ async function saveConfig() {
     if (timeoutInput) {
       state.llm_timeout_sec = Number(timeoutInput.value || 30);
     }
+    const logEnabled = document.getElementById('logLlmEnabled');
+    const logName = document.getElementById('logLlmName');
+    const logEndpoint = document.getElementById('logLlmEndpoint');
+    const logKey = document.getElementById('logLlmKey');
+    const logModel = document.getElementById('logLlmModel');
+    state.log_llm_provider = {
+      enabled: logEnabled ? logEnabled.value === 'true' : true,
+      name: logName ? logName.value.trim() : '',
+      endpoint: logEndpoint ? logEndpoint.value.trim() : '',
+      api_key: logKey ? logKey.value.trim() : '',
+      model: logModel ? logModel.value.trim() : ''
+    };
     const res = await fetch('/api/config', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'X-Access-Token': accessToken },

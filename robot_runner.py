@@ -122,7 +122,31 @@ def _build_llm_client(config: dict, monitoring: MonitoringClient | None = None) 
     return LLMClient(providers=providers, monitoring=monitoring)
 
 
-def _build_planner(config: dict, llm: LLMClient, memory: MemoryClient, monitoring: MonitoringClient) -> Planner:
+def _build_log_llm_client(config: dict) -> LLMClient | None:
+    item = config.get("log_llm_provider")
+    if not isinstance(item, dict) or not item.get("enabled", True):
+        return None
+    endpoint = item.get("endpoint")
+    api_key = item.get("api_key")
+    model = item.get("model")
+    if not (endpoint and api_key and model):
+        return None
+    timeout = int(config.get("llm_timeout_sec", 30) or 30)
+
+    def _make(endpoint: str, api_key: str, model: str) -> Callable[[str], str]:
+        return lambda prompt: _openai_generate(endpoint, api_key, model, prompt, timeout=timeout)
+
+    provider = LLMProvider(name=item.get("name") or model or "log-llm", generate=_make(endpoint, api_key, model))
+    return LLMClient(providers=[provider])
+
+
+def _build_planner(
+    config: dict,
+    llm: LLMClient,
+    memory: MemoryClient,
+    monitoring: MonitoringClient,
+    log_llm: LLMClient | None = None,
+) -> Planner:
     pref = config.get("trading_preferences", {})
     universe_cfg = pref.get("universe", {})
     horizon_cfg = pref.get("horizon", {})
@@ -148,7 +172,13 @@ def _build_planner(config: dict, llm: LLMClient, memory: MemoryClient, monitorin
         trading_market=market or ["现货"],
         allowed_actions=_build_allowed_actions(pref),
     )
-    return Planner(llm_client=llm, memory_client=memory, monitoring_client=monitoring, config=planner_cfg)
+    return Planner(
+        llm_client=llm,
+        log_llm_client=log_llm,
+        memory_client=memory,
+        monitoring_client=monitoring,
+        config=planner_cfg,
+    )
 
 
 def _build_okx(config: dict) -> OKXAdapter:
@@ -192,13 +222,25 @@ def _start_okx_ws(config: dict, monitoring: MonitoringClient) -> None:
 def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str, Any], Any], dict[str, Any]]]:
     def select_focus_universe(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         preferences = inputs.get("preferences") or {}
+        if not isinstance(preferences, dict):
+            preferences = {}
         max_pairs = int(inputs.get("max_pairs", preferences.get("max_pairs", 2)) or 2)
         pairs = inputs.get("pairs") or inputs.get("candidate_pairs") or inputs.get("candidates") or []
         if isinstance(pairs, str):
-            pairs = [pairs]
+            try:
+                parsed = json.loads(pairs)
+                pairs = parsed if isinstance(parsed, list) else [pairs]
+            except Exception:
+                pairs = [pairs]
+        flat_pairs: list[str] = []
+        for p in pairs:
+            if isinstance(p, (list, tuple)):
+                flat_pairs.extend([str(x) for x in p])
+            else:
+                flat_pairs.append(str(p))
         if not pairs:
             pairs = memory.get_focus_pairs(limit=max_pairs)
-        cleaned = [str(p) for p in pairs if p and not str(p).startswith("$")]
+        cleaned = [str(p) for p in (flat_pairs or pairs) if p and not str(p).startswith("$")]
         timeframe = preferences.get("timeframe") or inputs.get("timeframe") or "15m"
         timeframes = inputs.get("timeframes") or preferences.get("timeframes") or [timeframe]
         if isinstance(timeframes, str):
@@ -212,8 +254,16 @@ def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str
 
     def inspect_key_levels(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         pairs = inputs.get("pairs", [])
+        if isinstance(pairs, (list, tuple)):
+            flat: list[str] = []
+            for p in pairs:
+                if isinstance(p, (list, tuple)):
+                    flat.extend([str(x) for x in p])
+                else:
+                    flat.append(str(p))
+            pairs = flat
         timeframes = inputs.get("timeframes", ["15m"])
-        obs = f"Focus on {pairs} at {timeframes}. Check trend, support/resistance, volume spikes."
+        obs = f"观察{pairs}在{timeframes}周期下的趋势、支撑阻力与成交量变化。"
         return {"observations": [obs], "outputs": {"focus_observations": obs}}
 
     def define_focus_metrics(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
@@ -239,8 +289,14 @@ def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str
         pairs = inputs.get("pairs") or inputs.get("pair") or []
         if isinstance(pairs, str):
             pairs = [pairs]
-        memory.upsert_focus_pairs([str(p) for p in pairs])
-        return {"outputs": {"watchlist_added": pairs}}
+        cleaned = [str(p) for p in pairs if p and not str(p).startswith("$")]
+        if not cleaned:
+            return {
+                "outputs": {"watchlist_added": []},
+                "decisions": ["未提供有效币对，跳过加入关注。"],
+            }
+        memory.upsert_focus_pairs(cleaned)
+        return {"outputs": {"watchlist_added": cleaned}}
 
     def set_sleep(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         seconds = int(inputs.get("seconds", inputs.get("sleep", 0)) or 0)
@@ -262,7 +318,9 @@ def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str
 
 
 def _build_allowed_actions(pref: dict) -> list[str]:
-    market_cfg = pref.get("market", {})
+    if not isinstance(pref, dict):
+        pref = {}
+    market_cfg = pref.get("market", {}) if isinstance(pref.get("market", {}), dict) else {}
     allow_spot = bool(market_cfg.get("spot", True))
     allow_deriv = bool(market_cfg.get("derivatives", False))
 
@@ -299,7 +357,9 @@ def _build_allowed_actions(pref: dict) -> list[str]:
 
 
 def _suggest_timeframes(pref: dict) -> list[str]:
-    horizon = pref.get("horizon", {})
+    if not isinstance(pref, dict):
+        pref = {}
+    horizon = pref.get("horizon", {}) if isinstance(pref.get("horizon", {}), dict) else {}
     if horizon.get("scalp"):
         return ["1m", "5m"]
     if horizon.get("swing"):
@@ -384,12 +444,13 @@ def run_robot() -> None:
             try:
                 monitoring = MonitoringClient()
                 llm = _build_llm_client(config, monitoring)
+                log_llm = _build_log_llm_client(config)
             except RuntimeError as exc:
                 logger.warning("LLM初始化失败：%s", exc)
                 time.sleep(max(interval, 5))
                 continue
             memory = MemoryClient()
-            planner = _build_planner(config, llm, memory, monitoring)
+            planner = _build_planner(config, llm, memory, monitoring, log_llm)
             okx = _build_okx(config)
             _start_okx_ws(config, monitoring)
             alert_manager = PriceAlertManager(okx, monitoring=monitoring)
@@ -401,7 +462,10 @@ def run_robot() -> None:
 
             actions = {}
             full_actions = build_okx_actions(okx=okx, alert_manager=alert_manager, monitoring=monitoring)
-            allowed = set(_build_allowed_actions(config.get("trading_preferences", {})))
+            pref_cfg = config.get("trading_preferences", {})
+            if not isinstance(pref_cfg, dict):
+                pref_cfg = {}
+            allowed = set(_build_allowed_actions(pref_cfg))
             actions.update({name: handler for name, handler in full_actions.items() if name in allowed})
             actions.update(_build_planner_actions(memory))
 
@@ -414,6 +478,8 @@ def run_robot() -> None:
 
             watchlist = memory.get_focus_pairs(limit=10)
             pref = config.get("trading_preferences", {})
+            if not isinstance(pref, dict):
+                pref = {}
             timeframes = _suggest_timeframes(pref)
             candidates: list[str] = []
             if not has_positions and not sleep_active:

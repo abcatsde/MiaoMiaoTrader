@@ -42,6 +42,9 @@ class OKXPrivateWebSocket:
         self._monitoring = monitoring
         self._on_message = on_message
         self._stop_event = asyncio.Event()
+        self._last_alert_at: float = 0.0
+        self._last_log_at: float = 0.0
+        self._message_count: int = 0
 
     async def start(self, channels: Iterable[str]) -> None:
         if not (self._config.api_key and self._config.api_secret and self._config.passphrase):
@@ -49,18 +52,21 @@ class OKXPrivateWebSocket:
         retry = 0
         while not self._stop_event.is_set():
             try:
-                async with websockets.connect(self._config.url, ping_interval=20) as ws:
+                async with websockets.connect(self._config.url, ping_interval=20, ping_timeout=20) as ws:
                     await self._login(ws)
                     await self._subscribe(ws, channels)
+                    retry = 0
                     await self._recv_loop(ws)
             except Exception as exc:  # noqa: BLE001
                 logger.warning("WS disconnected: %s", exc)
-                if self._monitoring:
+                now = asyncio.get_running_loop().time()
+                if self._monitoring and (now - self._last_alert_at >= 30):
                     self._monitoring.raise_alert(
                         title="okx-ws-disconnect",
                         detail=str(exc),
                         severity="WARN",
                     )
+                    self._last_alert_at = now
                 if retry >= self._config.max_retries:
                     raise
                 await asyncio.sleep(self._config.backoff_base * (2**retry))
@@ -99,7 +105,11 @@ class OKXPrivateWebSocket:
                 continue
 
             if self._monitoring:
-                self._monitoring.log_event("ws.message", level="INFO")
+                self._monitoring.increment_stat("ws_message_count")
+                now = asyncio.get_running_loop().time()
+                if now - self._last_log_at >= 5:
+                    self._monitoring.log_event("ws.message", level="INFO")
+                    self._last_log_at = now
 
             if self._on_message:
                 self._on_message(message)
