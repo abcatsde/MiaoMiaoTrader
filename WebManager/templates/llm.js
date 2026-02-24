@@ -1,4 +1,5 @@
 let accessToken = '';
+let autoLoginBlocked = false;
 let state = {
   llm_providers: [],
   llm_timeout_sec: 30,
@@ -14,10 +15,22 @@ function setStatus(message, type = '') {
   status.textContent = message;
 }
 
+function handleInvalidToken(message = 'Invalid token') {
+  try { localStorage.removeItem('mm_token'); } catch (_e) {}
+  try { sessionStorage.setItem('mm_token_invalid', '1'); } catch (_e) {}
+  accessToken = '';
+  const loginView = document.getElementById('loginView');
+  const appView = document.getElementById('appView');
+  if (appView) appView.classList.add('hidden');
+  if (loginView) loginView.classList.remove('hidden');
+  setStatus(message, 'error');
+}
+
 function login() {
   const token = document.getElementById('token').value.trim();
   if (!token) return;
   accessToken = token;
+  try { sessionStorage.removeItem('mm_token_invalid'); } catch (_e) {}
   try { localStorage.setItem('mm_token', token); } catch (_e) {}
   document.getElementById('loginView').classList.add('hidden');
   document.getElementById('appView').classList.remove('hidden');
@@ -140,6 +153,7 @@ async function loadConfig() {
     const res = await fetch('/api/config', { headers: { 'X-Access-Token': accessToken }});
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) return handleInvalidToken(err.detail || 'Invalid token');
       throw new Error(err.detail || `加载失败（${res.status}）`);
     }
     const data = await res.json();
@@ -165,6 +179,7 @@ async function saveConfig() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) return handleInvalidToken(err.detail || 'Invalid token');
       throw new Error(err.detail || `保存失败（${res.status}）`);
     }
     setStatus('保存成功', 'ok');
@@ -182,6 +197,7 @@ async function restartApp() {
     });
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
+      if (res.status === 401) return handleInvalidToken(err.detail || 'Invalid token');
       throw new Error(err.detail || `重启失败（${res.status}）`);
     }
     const data = await res.json().catch(() => ({}));
@@ -203,11 +219,16 @@ window.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape') closeProviderModal();
   });
   try {
-    const saved = localStorage.getItem('mm_token');
+    autoLoginBlocked = sessionStorage.getItem('mm_token_invalid') === '1';
+  } catch (_e) { autoLoginBlocked = false; }
+  try {
+    const saved = (localStorage.getItem('mm_token') || '').trim();
     if (saved) {
       const tokenInput = document.getElementById('token');
       tokenInput.value = saved;
-      login();
+      if (!autoLoginBlocked) {
+        login();
+      }
     }
   } catch (_e) {}
 });
