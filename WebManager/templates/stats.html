@@ -2,15 +2,19 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MiaoMiaoTrader Stats</title>
     <link rel="stylesheet" href="/static/stats.css" />
   </head>
   <body>
     <div class="container">
       <div class="header">
-        <div class="title">运行统计</div>
         <div>
-          <a href="/">返回管理页</a>
+          <div class="title">运行统计</div>
+          <div class="subtitle">查看请求与交易指标</div>
+        </div>
+        <div>
+          <a class="link" href="/">返回管理页</a>
         </div>
       </div>
       <div class="card">
@@ -19,21 +23,23 @@
           <input id="token" placeholder="启动日志里的 token" />
         </div>
         <button class="btn" onclick="loadStats()">刷新统计</button>
-        <div class="row">
-          <div class="muted">已请求次数</div>
-          <div id="statRequests">-</div>
-        </div>
-        <div class="row">
-          <div class="muted">交易单数</div>
-          <div id="statTrades">-</div>
-        </div>
-        <div class="row">
-          <div class="muted">浮动盈亏</div>
-          <div id="statPnl">-</div>
-        </div>
-        <div class="row">
-          <div class="muted">当前持仓</div>
-          <div id="statPositions">-</div>
+        <div class="stats-grid">
+          <div class="stat-item">
+            <div class="muted">已请求次数</div>
+            <div id="statRequests" class="stat-value">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="muted">交易单数</div>
+            <div id="statTrades" class="stat-value">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="muted">浮动盈亏</div>
+            <div id="statPnl" class="stat-value">-</div>
+          </div>
+          <div class="stat-item">
+            <div class="muted">当前持仓</div>
+            <div id="statPositions" class="stat-value">-</div>
+          </div>
         </div>
       </div>
     </div>

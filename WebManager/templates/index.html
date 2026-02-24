@@ -2,34 +2,15 @@
 <html>
   <head>
     <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>MiaoMiaoTrader Manager</title>
     <link rel="stylesheet" href="/static/index.css" />
   </head>
   <body>
     <div id="loginView" class="center">
       <div class="login-card">
-        <div class="login-title">MiaoMiaoTrader 登录</div>
-        <div class="login-desc">输入启动日志中的 Token 后进入管理页面</div>
-        <div class="row">
-          <label>Access Token</label>
-          <input id="token" placeholder="启动日志里看到的 token" />
-        </div>
-        <div class="btn-row">
-          <button class="btn" onclick="login()">登录</button>
-        </div>
-      </div>
-    </div>
-<!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>MiaoMiaoTrader Manager</title>
-    <link rel="stylesheet" href="/static/index.css" />
-  </head>
-  <body>
-    <div id="loginView" class="center">
-      <div class="login-card">
-        <div class="login-title">MiaoMiaoTrader 登录</div>
+        <div class="brand">🐱 MiaoMiaoTrader</div>
+        <div class="login-title">管理控制台登录</div>
         <div class="login-desc">输入启动日志中的 Token 后进入管理页面</div>
         <div class="row">
           <label>Access Token</label>
@@ -43,7 +24,10 @@
 
     <div id="appView" class="container hidden">
       <div class="header">
-        <div class="title">MiaoMiaoTrader Manager</div>
+        <div>
+          <div class="title">MiaoMiaoTrader Manager</div>
+          <div class="subtitle">配置管理 · LLM 编排 · OKX 连接</div>
+        </div>
         <div class="btn-row">
           <button class="btn btn-ghost" onclick="loadConfig()">加载</button>
           <button class="btn" onclick="saveConfig()">保存</button>
@@ -54,23 +38,32 @@
 
       <div class="grid">
         <div class="card">
-          <h3>Web 端口</h3>
+          <div class="card-header">
+            <h3>Web 端口</h3>
+            <div class="card-subtitle">用于访问管理面板</div>
+          </div>
           <div class="row">
             <label>Web 端口</label>
             <input id="webPort" type="number" min="1" max="65535" />
           </div>
 
-          <h3>LLM 模型列表</h3>
+          <div class="card-header">
+            <h3>LLM 模型列表</h3>
+            <div class="card-subtitle">拖动调整优先级，靠前优先</div>
+          </div>
           <div class="row btn-row">
             <button class="btn" onclick="openProviderModal()">添加 LLM 模型</button>
             <button class="btn btn-ghost" onclick="addEmptyProvider()">添加空白</button>
           </div>
           <div class="llm-list" id="llmList"></div>
-          <div class="footer">拖动左侧图标调整优先级（靠前优先）。</div>
+          <div class="footer">支持多模型容错与轮换，建议至少配置 2 个模型。</div>
         </div>
 
         <div class="card">
-          <h3>交易偏好</h3>
+          <div class="card-header">
+            <h3>交易偏好</h3>
+            <div class="card-subtitle">基础参数与策略维度</div>
+          </div>
           <div class="split">
             <div class="row">
               <label>时间级别</label>
@@ -115,7 +108,10 @@
             </div>
           </div>
 
-          <h3>OKX 配置</h3>
+          <div class="card-header">
+            <h3>OKX 配置</h3>
+            <div class="card-subtitle">实盘/模拟盘与 API 凭据</div>
+          </div>
           <div class="row">
             <label>Base URL</label>
             <input id="okxBaseUrl" placeholder="https://www.okx.com" />
@@ -143,8 +139,11 @@
             <label class="check-row"><input type="checkbox" id="okxWeEnabled" /> 启用 WebSocket（we_enabled）</label>
           </div>
 
-          <h3>原始配置</h3>
-          <textarea id="configRaw"></textarea>
+          <div class="card-header">
+            <h3>原始配置</h3>
+            <div class="card-subtitle">高级编辑：直接修改 JSON</div>
+          </div>
+          <textarea id="configRaw" class="code"></textarea>
           <div class="muted">可在此直接编辑 JSON。保存时会优先使用当前表单数据。</div>
         </div>
       </div>
