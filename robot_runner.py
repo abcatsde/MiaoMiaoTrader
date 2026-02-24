@@ -168,13 +168,17 @@ def _start_okx_ws(config: dict, monitoring: MonitoringClient) -> None:
     okx_cfg = config.get("okx", {})
     if not (okx_cfg.get("we_enabled") or okx_cfg.get("ws_enabled")):
         return
+    ws_url = okx_cfg.get("ws_url") or "wss://ws.okx.com:8443/ws/v5/business"
+    if not isinstance(ws_url, str) or not ws_url.startswith("ws"):
+        logger.warning("Invalid ws_url, skipping OKX WebSocket: %s", ws_url)
+        return
     ws_config = OKXWebSocketConfig(
-        url=okx_cfg.get("ws_url", "wss://ws.okx.com:8443/ws/v5/business"),
+        url=ws_url,
         api_key=okx_cfg.get("api_key"),
         api_secret=okx_cfg.get("api_secret"),
         passphrase=okx_cfg.get("passphrase"),
     )
-    channels = okx_cfg.get("ws_channels", ["deposit-info", "withdrawal-info"])
+    channels = okx_cfg.get("ws_channels") or ["deposit-info", "withdrawal-info"]
 
     async def _run() -> None:
         client = OKXPrivateWebSocket(ws_config, monitoring=monitoring)

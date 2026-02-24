@@ -58,6 +58,11 @@ sudo systemctl enable miaomiao-trader
 sudo systemctl start miaomiao-trader
 ```
 
+停止服务：
+```
+sudo systemctl stop miaomiao-trader
+```
+
 查看日志：
 
 ```

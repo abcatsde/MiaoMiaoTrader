@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.responses import FileResponse
+from fastapi.staticfiles import StaticFiles
 from Monitoring import MonitoringClient
 from pydantic import BaseModel, Field
 
@@ -55,8 +56,8 @@ class OKXConfigModel(BaseModel):
     trade_mode: str = "real"  # real or demo
     we_enabled: bool = False
     ws_enabled: bool | None = None
-    ws_url: str | None = None
-    ws_channels: list[str] | None = None
+    ws_url: str = "wss://ws.okx.com:8443/ws/v5/business"
+    ws_channels: list[str] = Field(default_factory=lambda: ["deposit-info", "withdrawal-info"])
 
 
 class AppConfig(BaseModel):
@@ -76,6 +77,8 @@ class TokenState:
 
 app = FastAPI(title="MiaoMiaoTrader Web Manager")
 TOKEN_STATE = TokenState(token=secrets.token_urlsafe(24))
+
+app.mount("/static", StaticFiles(directory=str(BASE_DIR / "templates")), name="static")
 
 
 @app.on_event("startup")
@@ -134,6 +137,11 @@ def _require_token(x_access_token: str | None) -> None:
 @app.get("/", response_class=HTMLResponse)
 def index() -> str:
     return FileResponse(str(BASE_DIR / "templates" / "index.html"))
+
+
+@app.get("/stats", response_class=HTMLResponse)
+def stats_page() -> str:
+    return FileResponse(str(BASE_DIR / "templates" / "stats.html"))
 
 
 @app.get("/api/config")
