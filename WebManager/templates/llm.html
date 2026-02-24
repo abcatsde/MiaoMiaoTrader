@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiaoMiaoTrader LLM</title>
+    <link rel="stylesheet" href="/static/index.css" />
+  </head>
+  <body>
+    <div id="loginView" class="center">
+      <div class="login-card">
+        <div class="brand">🐱 MiaoMiaoTrader</div>
+        <div class="login-title">管理控制台登录</div>
+        <div class="login-desc">输入启动日志中的 Token 后进入管理页面</div>
+        <div class="row">
+          <label>Access Token</label>
+          <input id="token" placeholder="启动日志里看到的 token" />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="login()">登录</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="appView" class="container hidden">
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-title">配置中心</div>
+          <nav class="nav">
+            <a class="nav-link" href="/">交易偏好</a>
+            <a class="nav-link active" href="/llm">LLM 模型</a>
+            <a class="nav-link" href="/stats">运行统计</a>
+          </nav>
+          <div class="sidebar-foot muted">MiaoMiaoTrader</div>
+        </aside>
+
+        <main class="content">
+          <div class="header">
+            <div>
+              <div class="title">LLM 模型列表</div>
+              <div class="subtitle">拖动调整优先级，靠前优先</div>
+            </div>
+            <div class="btn-row">
+              <div id="status" class="status muted">就绪</div>
+              <button class="btn btn-ghost" onclick="loadConfig()">加载</button>
+              <button class="btn" onclick="saveConfig()">保存</button>
+              <button class="btn btn-danger" onclick="restartApp()">重启服务</button>
+            </div>
+          </div>
+
+          <div class="card">
+            <div class="row btn-row">
+              <button class="btn" onclick="openProviderModal()">添加 LLM 模型</button>
+              <button class="btn btn-ghost" onclick="addEmptyProvider()">添加空白</button>
+            </div>
+            <div class="llm-list" id="llmList"></div>
+            <div class="footer">支持多模型容错与轮换，建议至少配置 2 个模型。</div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <div id="providerModal" class="modal-backdrop hidden">
+      <div class="modal">
+        <h3>添加 LLM 模型</h3>
+        <div class="modal-steps">
+          <div class="modal-step">
+            <label>第 1 层：模型名称</label>
+            <input id="providerName" placeholder="openai" />
+          </div>
+          <div class="modal-step">
+            <label>第 2 层：API Key</label>
+            <input id="providerKey" placeholder="sk-..." />
+          </div>
+          <div class="modal-step">
+            <label>第 3 层：API 地址</label>
+            <input id="providerEndpoint" placeholder="https://api.openai.com/v1" />
+          </div>
+          <div class="modal-step">
+            <label>模型</label>
+            <input id="providerModel" placeholder="gpt-4o-mini" />
+          </div>
+        </div>
+        <div class="modal-actions">
+          <button class="btn btn-ghost" onclick="closeProviderModal()">取消</button>
+          <button class="btn" onclick="saveProviderFromModal()">保存</button>
+        </div>
+      </div>
+    </div>
+
+    <script src="/static/llm.js"></script>
+  </body>
+</html>

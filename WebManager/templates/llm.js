@@ -125,113 +125,10 @@ function removeProvider(index) {
 }
 
 function syncRaw() {
-  const raw = document.getElementById('configRaw');
-  if (!raw) return;
-  raw.value = JSON.stringify(state, null, 2);
-}
-
-function syncFormToState() {
-  const prefTimeframe = document.getElementById('prefTimeframe');
-  const prefMaxPairs = document.getElementById('prefMaxPairs');
-  const prefMaxTF = document.getElementById('prefMaxTF');
-  const prefMarginMode = document.getElementById('prefMarginMode');
-  const optMainstream = document.getElementById('optMainstream');
-  const optAlt = document.getElementById('optAlt');
-  const optScalp = document.getElementById('optScalp');
-  const optIntraday = document.getElementById('optIntraday');
-  const optSwing = document.getElementById('optSwing');
-  const optSpot = document.getElementById('optSpot');
-  const optDeriv = document.getElementById('optDeriv');
-
-  if (prefTimeframe && prefMaxPairs && prefMaxTF && prefMarginMode) {
-    state.trading_preferences = {
-      timeframe: prefTimeframe.value || '15m',
-      max_pairs: Number(prefMaxPairs.value || 2),
-      max_timeframes: Number(prefMaxTF.value || 2),
-      margin_mode: prefMarginMode.value || 'isolated',
-      universe: {
-        mainstream: !!optMainstream?.checked,
-        alt: !!optAlt?.checked
-      },
-      horizon: {
-        scalp: !!optScalp?.checked,
-        intraday: !!optIntraday?.checked,
-        swing: !!optSwing?.checked
-      },
-      market: {
-        spot: !!optSpot?.checked,
-        derivatives: !!optDeriv?.checked
-      }
-    };
-  }
-
-  const okxBaseUrl = document.getElementById('okxBaseUrl');
-  const okxKey = document.getElementById('okxKey');
-  const okxSecret = document.getElementById('okxSecret');
-  const okxPass = document.getElementById('okxPass');
-  const okxTradeMode = document.getElementById('okxTradeMode');
-  const okxWeEnabled = document.getElementById('okxWeEnabled');
-
-  if (okxBaseUrl && okxKey && okxSecret && okxPass && okxTradeMode) {
-    state.okx = {
-      base_url: okxBaseUrl.value || 'https://www.okx.com',
-      api_key: okxKey.value || '',
-      api_secret: okxSecret.value || '',
-      passphrase: okxPass.value || '',
-      trade_mode: okxTradeMode.value || 'real',
-      we_enabled: !!okxWeEnabled?.checked
-    };
-  }
-
-  const webPort = document.getElementById('webPort');
-  if (webPort) {
-    state.web_port = Number(webPort.value || 8088);
-  }
+  // 预留：若以后单独提供原始 JSON 编辑
 }
 
 function syncStateToForm() {
-  const prefTimeframe = document.getElementById('prefTimeframe');
-  const prefMaxPairs = document.getElementById('prefMaxPairs');
-  const prefMaxTF = document.getElementById('prefMaxTF');
-  const prefMarginMode = document.getElementById('prefMarginMode');
-  const optMainstream = document.getElementById('optMainstream');
-  const optAlt = document.getElementById('optAlt');
-  const optScalp = document.getElementById('optScalp');
-  const optIntraday = document.getElementById('optIntraday');
-  const optSwing = document.getElementById('optSwing');
-  const optSpot = document.getElementById('optSpot');
-  const optDeriv = document.getElementById('optDeriv');
-
-  if (prefTimeframe) prefTimeframe.value = state.trading_preferences?.timeframe || '15m';
-  if (prefMaxPairs) prefMaxPairs.value = state.trading_preferences?.max_pairs ?? 2;
-  if (prefMaxTF) prefMaxTF.value = state.trading_preferences?.max_timeframes ?? 2;
-  if (prefMarginMode) prefMarginMode.value = state.trading_preferences?.margin_mode || 'isolated';
-  if (optMainstream) optMainstream.checked = !!state.trading_preferences?.universe?.mainstream;
-  if (optAlt) optAlt.checked = !!state.trading_preferences?.universe?.alt;
-  if (optScalp) optScalp.checked = !!state.trading_preferences?.horizon?.scalp;
-  if (optIntraday) optIntraday.checked = !!state.trading_preferences?.horizon?.intraday;
-  if (optSwing) optSwing.checked = !!state.trading_preferences?.horizon?.swing;
-  if (optSpot) optSpot.checked = !!state.trading_preferences?.market?.spot;
-  if (optDeriv) optDeriv.checked = !!state.trading_preferences?.market?.derivatives;
-
-  const okxBaseUrl = document.getElementById('okxBaseUrl');
-  const okxKey = document.getElementById('okxKey');
-  const okxSecret = document.getElementById('okxSecret');
-  const okxPass = document.getElementById('okxPass');
-  const okxTradeMode = document.getElementById('okxTradeMode');
-  const okxWeEnabled = document.getElementById('okxWeEnabled');
-
-  if (okxBaseUrl) okxBaseUrl.value = state.okx?.base_url || 'https://www.okx.com';
-  if (okxKey) okxKey.value = state.okx?.api_key || '';
-  if (okxSecret) okxSecret.value = state.okx?.api_secret || '';
-  if (okxPass) okxPass.value = state.okx?.passphrase || '';
-  if (okxTradeMode) okxTradeMode.value = state.okx?.trade_mode || 'real';
-  if (okxWeEnabled) okxWeEnabled.checked = !!state.okx?.we_enabled;
-
-  const webPort = document.getElementById('webPort');
-  if (webPort) webPort.value = state.web_port ?? 8088;
-
-  syncRaw();
   renderLLMList();
 }
 
@@ -253,7 +150,6 @@ async function loadConfig() {
 
 async function saveConfig() {
   try {
-    syncFormToState();
     setStatus('保存中...', 'warn');
     const res = await fetch('/api/config', {
       method: 'POST',
@@ -307,14 +203,4 @@ window.addEventListener('DOMContentLoaded', () => {
       login();
     }
   } catch (_e) {}
-  const raw = document.getElementById('configRaw');
-  if (raw) {
-    raw.addEventListener('input', (e) => {
-      try {
-        const parsed = JSON.parse(e.target.value);
-        state = parsed;
-        syncStateToForm();
-      } catch (_e) {}
-    });
-  }
 });
