@@ -91,11 +91,13 @@ class Executor:
         lang = self._get_log_lang()
         title = self._truncate(step.title)
         if lang == "zh":
-            reason = self._truncate(step.reasoning) if step.reasoning else ""
+            reason, stance = self._split_stance(step.reasoning)
             inputs_text = self._format_kv(inputs, lang="zh")
             parts = [f"步骤{step.step_id}开始：{title or step.action}（{step.action}）"]
             if reason:
                 parts.append(f"理由：{reason}")
+            if stance:
+                parts.append(f"态度：{stance}")
             if inputs_text:
                 parts.append(f"输入：{inputs_text}")
             return "；".join(parts)
@@ -145,7 +147,13 @@ class Executor:
 
     def _format_value(self, value: Any) -> str:
         if isinstance(value, (list, tuple)):
-            return "[" + "、".join(self._truncate(v) for v in value) + "]"
+            flat: list[Any] = []
+            for item in value:
+                if isinstance(item, (list, tuple)):
+                    flat.extend(item)
+                else:
+                    flat.append(item)
+            return "[" + "、".join(self._truncate(v) for v in flat) + "]"
         if isinstance(value, dict):
             try:
                 return json.dumps(value, ensure_ascii=False, default=str)
@@ -183,6 +191,34 @@ class Executor:
                 if h:
                     parts.append("周期偏好" + "/".join(h))
             return "，".join(parts) if parts else value
+        if key == "universe" and isinstance(value, dict):
+            u = []
+            if value.get("mainstream"):
+                u.append("主流币")
+            if value.get("alt"):
+                u.append("山寨币")
+            return "/".join(u) if u else value
+        if key == "horizon" and isinstance(value, dict):
+            h = []
+            if value.get("scalp"):
+                h.append("短线")
+            if value.get("intraday"):
+                h.append("日内")
+            if value.get("swing"):
+                h.append("中长线")
+            return "/".join(h) if h else value
+        if key == "horizon" and isinstance(value, (list, tuple)):
+            mapping = {"scalp": "短线", "intraday": "日内", "swing": "中长线"}
+            return "/".join(mapping.get(str(x), str(x)) for x in value)
+        if key == "horizon" and isinstance(value, str):
+            mapping = {"scalp": "短线", "intraday": "日内", "swing": "中长线"}
+            return mapping.get(value, value)
+        if key == "market" and isinstance(value, (list, tuple)):
+            mapping = {"spot": "现货", "derivatives": "合约"}
+            return "/".join(mapping.get(str(x), str(x)) for x in value)
+        if key == "market" and isinstance(value, str):
+            mapping = {"spot": "现货", "derivatives": "合约"}
+            return mapping.get(value, value)
         return value
 
     def _translate_key(self, key: str) -> str:
@@ -200,10 +236,32 @@ class Executor:
             "max_pairs": "最大币对数",
             "max_timeframes": "最大周期数",
             "preferences": "偏好",
+            "universe": "币种范围",
+            "horizon": "交易周期",
+            "market": "交易市场",
             "focus_pairs": "关注币对",
             "focus_timeframes": "关注周期",
+            "focus_observations": "关注观察",
+            "risk_notes": "风险提示",
+            "watchlist_added": "已加入关注",
+            "sleep_seconds": "暂停秒数",
+            "sleep_reason": "暂停原因",
         }
         return mapping.get(key, key)
+
+    def _split_stance(self, reasoning: str | None) -> tuple[str, str]:
+        if not reasoning:
+            return "", ""
+        text = self._truncate(reasoning)
+        stance = ""
+        match = re.search(r"\bstance\s*=\s*([^\s]+)", text, flags=re.IGNORECASE)
+        if not match:
+            match = re.search(r"\b态度\s*[:=]\s*([^\s]+)", text)
+        if match:
+            stance = match.group(1).strip()
+            text = re.sub(r"\s*stance\s*=\s*[^\s]+", "", text, flags=re.IGNORECASE)
+            text = re.sub(r"\s*态度\s*[:=]\s*[^\s]+", "", text)
+        return text.strip(), stance.strip()
 
     def _get_log_lang(self) -> str:
         config_path = Path(__file__).resolve().parents[1] / "config" / "app.json"
@@ -229,6 +287,13 @@ class Executor:
     def _resolve_inputs(self, step: PlanStep, ctx: ExecutionContext) -> dict[str, Any]:
         resolved: dict[str, Any] = {}
         key_map = {k.lower(): k for k in ctx.data.keys()}
+        alias = {
+            "selected_pairs": "focus_pairs",
+            "selected_pair": "focus_pairs",
+            "recommended_pairs": "focus_pairs",
+            "recommended_pair": "focus_pairs",
+            "focus_pair": "focus_pairs",
+        }
         for key, value in step.inputs.items():
             if isinstance(value, str):
                 raw = value.strip()
@@ -247,7 +312,7 @@ class Executor:
                         var_name = match.group(1)
 
                 if var_name:
-                    lookup_key = key_map.get(var_name.lower())
+                    lookup_key = key_map.get(alias.get(var_name.lower(), var_name.lower()))
                     if lookup_key in ctx.data:
                         data_value = ctx.data[lookup_key]
                         if index is not None and isinstance(data_value, (list, tuple)):
