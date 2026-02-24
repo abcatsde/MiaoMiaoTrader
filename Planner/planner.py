@@ -135,20 +135,19 @@ class Planner:
             f"- Market: {', '.join(self._config.trading_market)}\n"
         )
         return (
-            "You are a trading assistant planner. "
-            "Return an ordered list of steps, each with: title, action, inputs, outputs, and a brief rationale. "
-            "Rationale must be short (<= 20 words) and can include a stance like bullish/bearish/neutral. "
-            "Use concise steps and no more than the max steps."
-            f"\nGoal: {task.goal}"
+            "你是交易规划助手。请输出中文的步骤列表，每步包含：title、action、inputs、outputs、rationale。"
+            "rationale 要简短（<=20字），并可包含态度：偏多/偏空/中性。"
+            "步骤数量不超过上限，表达简洁。"
+            f"\n目标：{task.goal}"
             f"{context_block}"
             f"{memory_block}"
             f"{actions_block}"
             f"{behavior_block}"
             f"{policy_block}"
-            "\nPreferred JSON format:\n"
-            '{"steps":[{"title":"...","action":"...","inputs":{...},"outputs":[...],"rationale":"...","stance":"neutral"}]}\n'
-            "Fallback text format:\n"
-            "1. Title | Action | Inputs=k:v;... | Outputs=a,b,c | Rationale=... | Stance=neutral\n"
+            "\n首选 JSON 格式：\n"
+            '{"steps":[{"title":"...","action":"...","inputs":{...},"outputs":[...],"rationale":"...","stance":"中性"}]}\n'
+            "备用文本格式：\n"
+            "1. 标题 | 动作 | Inputs=k:v;... | Outputs=a,b,c | Rationale=... | Stance=中性\n"
         )
 
     def _build_memory_context(self) -> str:

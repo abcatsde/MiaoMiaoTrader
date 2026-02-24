@@ -38,31 +38,7 @@ def _load_log_lang() -> str:
 
 
 def _translate_message(message: str) -> str:
-    output = message
-    output = output.replace("plan.created", "计划已创建")
-    output = output.replace("plan.start", "计划开始")
-    output = output.replace("plan.done", "计划完成")
-    output = output.replace("plan.failed", "计划失败")
-    output = output.replace("step.start:", "步骤开始:")
-    output = output.replace("step.done:", "步骤完成:")
-    output = output.replace("Robot loop error", "机器人循环错误")
-    output = output.replace("Request failed", "请求失败")
-    output = output.replace("Network error", "网络错误")
-    output = output.replace("Invalid JSON", "无效 JSON")
-    output = output.replace("Missing API key/secret/passphrase for signed request.", "签名请求缺少 API Key/Secret/Passphrase。")
-    output = output.replace("Restart disabled", "重启已禁用")
-    output = output.replace("Invalid token", "Token 无效")
-    output = output.replace("WebManager Access token", "Web 管理访问 Token")
-    output = output.replace("title=", "标题=")
-    output = output.replace("inputs=", "输入=")
-    output = output.replace("outputs=", "输出=")
-    output = output.replace("observations=", "观察=")
-    output = output.replace("decisions=", "决策=")
-    output = output.replace("errors=", "错误=")
-    output = output.replace("rationale=", "理由=")
-    output = output.replace("stance=", "态度=")
-    output = output.replace("Start", "启动")
-    return output
+    return message
 
 
 class _LangFilter(logging.Filter):

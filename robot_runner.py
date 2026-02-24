@@ -191,11 +191,24 @@ def _start_okx_ws(config: dict, monitoring: MonitoringClient) -> None:
 
 def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str, Any], Any], dict[str, Any]]]:
     def select_focus_universe(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
-        max_pairs = int(inputs.get("max_pairs", 2))
-        pairs = inputs.get("pairs") or []
+        preferences = inputs.get("preferences") or {}
+        max_pairs = int(inputs.get("max_pairs", preferences.get("max_pairs", 2)) or 2)
+        pairs = inputs.get("pairs") or inputs.get("candidate_pairs") or inputs.get("candidates") or []
+        if isinstance(pairs, str):
+            pairs = [pairs]
         if not pairs:
             pairs = memory.get_focus_pairs(limit=max_pairs)
-        return {"outputs": {"focus_pairs": list(pairs)[:max_pairs], "focus_timeframes": ["15m"]}}
+        cleaned = [str(p) for p in pairs if p and not str(p).startswith("$")]
+        timeframe = preferences.get("timeframe") or inputs.get("timeframe") or "15m"
+        timeframes = inputs.get("timeframes") or preferences.get("timeframes") or [timeframe]
+        if isinstance(timeframes, str):
+            timeframes = [timeframes]
+        return {
+            "outputs": {
+                "focus_pairs": cleaned[:max_pairs],
+                "focus_timeframes": list(timeframes),
+            }
+        }
 
     def inspect_key_levels(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         pairs = inputs.get("pairs", [])
@@ -311,6 +324,29 @@ def _pick_candidate_pairs(tickers_payload: dict, limit: int = 5) -> list[str]:
     return [inst_id for inst_id, _ in items[:limit]]
 
 
+def _refresh_positions_stats(okx: OKXAdapter, monitoring: MonitoringClient, inst_type: str = "SWAP") -> dict:
+    positions_payload: dict = {}
+    try:
+        positions_payload = okx.get_positions(inst_type=inst_type)
+    except Exception:
+        positions_payload = {}
+
+    positions_data = positions_payload.get("data") if isinstance(positions_payload, dict) else None
+    position_ids = [p.get("instId") for p in (positions_data or []) if isinstance(p, dict)]
+    try:
+        unrealized = 0.0
+        for p in positions_data or []:
+            if not isinstance(p, dict):
+                continue
+            upl = p.get("upl") or p.get("uPnl") or 0
+            unrealized += float(upl)
+        monitoring.set_stat("pnl_unrealized", str(unrealized))
+        monitoring.set_stat("current_positions", json.dumps(position_ids, ensure_ascii=False))
+    except Exception:
+        monitoring.set_stat("current_positions", json.dumps([], ensure_ascii=False))
+    return {"positions": positions_data or [], "position_ids": position_ids}
+
+
 def run_robot() -> None:
     """Robot main loop using Planner + Executor."""
     setup_logging()
@@ -318,6 +354,7 @@ def run_robot() -> None:
 
     next_check_after = 0.0
     sleep_reason = ""
+    startup_positions_fetched = False
     while True:
         now = time.time()
         sleep_active = now < next_check_after
@@ -358,6 +395,10 @@ def run_robot() -> None:
             alert_manager = PriceAlertManager(okx, monitoring=monitoring)
             backtest = BacktestEngine()
 
+            if not startup_positions_fetched:
+                _refresh_positions_stats(okx, monitoring, inst_type="SWAP")
+                startup_positions_fetched = True
+
             actions = {}
             full_actions = build_okx_actions(okx=okx, alert_manager=alert_manager, monitoring=monitoring)
             allowed = set(_build_allowed_actions(config.get("trading_preferences", {})))
@@ -366,26 +407,10 @@ def run_robot() -> None:
 
             executor = Executor(actions=actions, monitoring=monitoring, memory=memory, backtest=backtest)
 
-            positions_payload = {}
-            try:
-                positions_payload = okx.get_positions(inst_type="SWAP")
-            except Exception:
-                positions_payload = {}
-
-            positions_data = positions_payload.get("data") if isinstance(positions_payload, dict) else None
+            positions_info = _refresh_positions_stats(okx, monitoring, inst_type="SWAP")
+            positions_data = positions_info["positions"]
+            position_ids = positions_info["position_ids"]
             has_positions = bool(positions_data)
-            position_ids = [p.get("instId") for p in (positions_data or []) if isinstance(p, dict)]
-            try:
-                unrealized = 0.0
-                for p in positions_data or []:
-                    if not isinstance(p, dict):
-                        continue
-                    upl = p.get("upl") or p.get("uPnl") or 0
-                    unrealized += float(upl)
-                monitoring.set_stat("pnl_unrealized", str(unrealized))
-                monitoring.set_stat("current_positions", json.dumps(position_ids, ensure_ascii=False))
-            except Exception:
-                pass
 
             watchlist = memory.get_focus_pairs(limit=10)
             pref = config.get("trading_preferences", {})

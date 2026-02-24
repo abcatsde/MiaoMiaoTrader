@@ -2,6 +2,8 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import json
+from pathlib import Path
+import re
 from typing import Any, Callable, Dict, Iterable, Optional
 
 from Backtest import BacktestEngine
@@ -86,17 +88,42 @@ class Executor:
 
     def _format_step_start(self, step: PlanStep, ctx: ExecutionContext) -> str:
         inputs = self._resolve_inputs(step, ctx)
+        lang = self._get_log_lang()
+        title = self._truncate(step.title)
+        if lang == "zh":
+            reason = self._truncate(step.reasoning) if step.reasoning else ""
+            inputs_text = self._format_kv(inputs, lang="zh")
+            parts = [f"步骤{step.step_id}开始：{title or step.action}（{step.action}）"]
+            if reason:
+                parts.append(f"理由：{reason}")
+            if inputs_text:
+                parts.append(f"输入：{inputs_text}")
+            return "；".join(parts)
+
         inputs_text = self._format_kv(inputs)
         reasoning = f" | rationale={self._truncate(step.reasoning)}" if step.reasoning else ""
-        title = self._truncate(step.title)
         return f"step.start:{step.step_id}:{step.action} | title={title}{reasoning} | inputs={inputs_text}"
 
     def _format_step_done(self, step: PlanStep, result: dict[str, Any], ctx: ExecutionContext) -> str:
         outputs = result.get("outputs")
-        outputs_text = self._format_kv(outputs) if isinstance(outputs, dict) else self._truncate(outputs)
         obs = result.get("observations")
         dec = result.get("decisions")
         err = result.get("errors")
+        lang = self._get_log_lang()
+        if lang == "zh":
+            outputs_text = self._format_kv(outputs, lang="zh") if isinstance(outputs, dict) else self._truncate(outputs)
+            parts = [f"步骤{step.step_id}完成：{step.action}"]
+            if outputs is not None and outputs_text:
+                parts.append(f"输出：{outputs_text}")
+            if obs:
+                parts.append(f"观察：{self._truncate(obs)}")
+            if dec:
+                parts.append(f"决策：{self._truncate(dec)}")
+            if err:
+                parts.append(f"错误：{self._truncate(err)}")
+            return "；".join(parts)
+
+        outputs_text = self._format_kv(outputs) if isinstance(outputs, dict) else self._truncate(outputs)
         parts = [f"step.done:{step.step_id}:{step.action}"]
         if outputs is not None:
             parts.append(f"outputs={outputs_text}")
@@ -108,11 +135,86 @@ class Executor:
             parts.append(f"errors={self._truncate(err)}")
         return " | ".join(parts)
 
-    def _format_kv(self, payload: Any, limit: int = 6) -> str:
+    def _format_kv(self, payload: Any, limit: int = 6, lang: str = "en") -> str:
         if not isinstance(payload, dict):
             return self._truncate(payload)
         items = list(payload.items())[:limit]
+        if lang == "zh":
+            return "、".join(f"{self._translate_key(k)}={self._format_value(self._prettify_value(k, v))}" for k, v in items)
         return "; ".join(f"{k}={self._truncate(v)}" for k, v in items)
+
+    def _format_value(self, value: Any) -> str:
+        if isinstance(value, (list, tuple)):
+            return "[" + "、".join(self._truncate(v) for v in value) + "]"
+        if isinstance(value, dict):
+            try:
+                return json.dumps(value, ensure_ascii=False, default=str)
+            except Exception:
+                return self._truncate(value)
+        return self._truncate(value)
+
+    def _prettify_value(self, key: str, value: Any) -> Any:
+        if key in ("preferences", "pref", "preference") and isinstance(value, dict):
+            timeframe = value.get("timeframe")
+            max_pairs = value.get("max_pairs")
+            market = value.get("market")
+            horizon = value.get("horizon")
+            parts: list[str] = []
+            if timeframe:
+                parts.append(f"周期{timeframe}")
+            if max_pairs is not None:
+                parts.append(f"最多{max_pairs}个币对")
+            if isinstance(market, dict):
+                m = []
+                if market.get("spot"):
+                    m.append("现货")
+                if market.get("derivatives"):
+                    m.append("合约")
+                if m:
+                    parts.append("市场" + "/".join(m))
+            if isinstance(horizon, dict):
+                h = []
+                if horizon.get("scalp"):
+                    h.append("短线")
+                if horizon.get("intraday"):
+                    h.append("日内")
+                if horizon.get("swing"):
+                    h.append("中长线")
+                if h:
+                    parts.append("周期偏好" + "/".join(h))
+            return "，".join(parts) if parts else value
+        return value
+
+    def _translate_key(self, key: str) -> str:
+        mapping = {
+            "candidate_pairs": "候选币对",
+            "candidates": "候选币对",
+            "pairs": "币对",
+            "pair": "币对",
+            "symbol": "币对",
+            "inst_id": "合约标的",
+            "timeframes": "周期",
+            "timeframe": "周期",
+            "bar": "周期",
+            "limit": "数量",
+            "max_pairs": "最大币对数",
+            "max_timeframes": "最大周期数",
+            "preferences": "偏好",
+            "focus_pairs": "关注币对",
+            "focus_timeframes": "关注周期",
+        }
+        return mapping.get(key, key)
+
+    def _get_log_lang(self) -> str:
+        config_path = Path(__file__).resolve().parents[1] / "config" / "app.json"
+        if not config_path.exists():
+            return "zh"
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+            value = data.get("log_lang", "zh")
+            return value if value in ("zh", "en") else "zh"
+        except Exception:
+            return "zh"
 
     def _truncate(self, value: Any, max_len: int = 300) -> str:
         if isinstance(value, (dict, list, tuple)):
@@ -126,11 +228,37 @@ class Executor:
 
     def _resolve_inputs(self, step: PlanStep, ctx: ExecutionContext) -> dict[str, Any]:
         resolved: dict[str, Any] = {}
+        key_map = {k.lower(): k for k in ctx.data.keys()}
         for key, value in step.inputs.items():
-            if isinstance(value, str) and value in ctx.data:
-                resolved[key] = ctx.data[value]
-            else:
-                resolved[key] = value
+            if isinstance(value, str):
+                raw = value.strip()
+                if raw in ctx.data:
+                    resolved[key] = ctx.data[raw]
+                    continue
+                match = re.match(r"^\$?([A-Za-z_][A-Za-z0-9_]*)\[(\d+)\]$", raw)
+                index = None
+                var_name = None
+                if match:
+                    var_name = match.group(1)
+                    index = int(match.group(2))
+                else:
+                    match = re.match(r"^\$?([A-Za-z_][A-Za-z0-9_]*)$", raw)
+                    if match:
+                        var_name = match.group(1)
+
+                if var_name:
+                    lookup_key = key_map.get(var_name.lower())
+                    if lookup_key in ctx.data:
+                        data_value = ctx.data[lookup_key]
+                        if index is not None and isinstance(data_value, (list, tuple)):
+                            if 0 <= index < len(data_value):
+                                resolved[key] = data_value[index]
+                            else:
+                                resolved[key] = data_value
+                        else:
+                            resolved[key] = data_value
+                        continue
+            resolved[key] = value
         return resolved
 
     def _apply_result(self, step: PlanStep, result: dict[str, Any], ctx: ExecutionContext) -> None:

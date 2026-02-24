@@ -58,34 +58,7 @@ let lastEvents = [];
 let lastAlerts = [];
 
 function translateLogLine(line) {
-  if (logLang !== 'zh') return line;
-  let output = line;
-  const levelMap = {
-    INFO: '信息',
-    WARN: '警告',
-    WARNING: '警告',
-    ERROR: '错误',
-    CRITICAL: '严重',
-    DEBUG: '调试'
-  };
-  output = output.replace(/^(INFO|WARN|WARNING|ERROR|CRITICAL|DEBUG)\b/, (m) => levelMap[m] || m);
-  output = output.replace('plan.created', '计划已创建');
-  output = output.replace('plan.start', '计划开始');
-  output = output.replace('plan.done', '计划完成');
-  output = output.replace('plan.failed', '计划失败');
-  output = output.replace('step.start:', '步骤开始:');
-  output = output.replace('step.done:', '步骤完成:');
-  output = output.replace('robot-error', '机器人错误');
-  output = output.replace('request_count', '请求次数');
-  output = output.replace('title=', '标题=');
-  output = output.replace('inputs=', '输入=');
-  output = output.replace('outputs=', '输出=');
-  output = output.replace('observations=', '观察=');
-  output = output.replace('decisions=', '决策=');
-  output = output.replace('errors=', '错误=');
-  output = output.replace('rationale=', '理由=');
-  output = output.replace('stance=', '态度=');
-  return output;
+  return line;
 }
 
 function renderLogList(targetId, lines, emptyText) {
