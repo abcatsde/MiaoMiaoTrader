@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>MiaoMiaoTrader Manager</title>
+    <link rel="stylesheet" href="/static/index.css" />
+  </head>
+  <body>
+    <div id="loginView" class="center">
+      <div class="login-card">
+        <div class="brand">🐱 MiaoMiaoTrader</div>
+        <div class="login-title">管理控制台登录</div>
+        <div class="login-desc">输入启动日志中的 Token 后进入管理页面</div>
+        <div class="row">
+          <label>Access Token</label>
+          <input id="token" placeholder="启动日志里看到的 token" />
+        </div>
+        <div class="btn-row">
+          <button class="btn" onclick="login()">登录</button>
+        </div>
+      </div>
+    </div>
+
+    <div id="appView" class="container hidden">
+      <div class="layout">
+        <aside class="sidebar">
+          <div class="sidebar-title">配置中心</div>
+          <nav class="nav">
+            <a class="nav-link active" href="/">交易偏好</a>
+            <a class="nav-link" href="/llm">LLM 模型</a>
+            <a class="nav-link" href="/stats">运行统计</a>
+          </nav>
+          <div class="sidebar-foot muted">MiaoMiaoTrader</div>
+        </aside>
+
+        <main class="content">
+          <div class="header">
+            <div>
+              <div class="title">交易偏好与选项</div>
+              <div class="subtitle">基础参数、市场范围与 OKX 连接</div>
+            </div>
+            <div class="btn-row">
+              <div id="status" class="status muted">就绪</div>
+              <button class="btn btn-ghost" onclick="loadConfig()">加载</button>
+              <button class="btn" onclick="saveConfig()">保存</button>
+              <button class="btn btn-danger" onclick="restartApp()">重启服务</button>
+            </div>
+          </div>
+
+          <div class="grid">
+            <div class="card">
+              <div class="card-header">
+                <h3>交易偏好</h3>
+                <div class="card-subtitle">基础参数与策略维度</div>
+              </div>
+              <div class="split">
+                <div class="row">
+                  <label>时间级别</label>
+                  <input id="prefTimeframe" placeholder="15m" />
+                </div>
+                <div class="row">
+                  <label>最大币对数</label>
+                  <input id="prefMaxPairs" type="number" min="1" />
+                </div>
+                <div class="row">
+                  <label>最大级别数</label>
+                  <input id="prefMaxTF" type="number" min="1" />
+                </div>
+                <div class="row">
+                  <label>默认保证金模式</label>
+                  <select id="prefMarginMode">
+                    <option value="isolated">isolated（逐仓）</option>
+                    <option value="cross">cross（全仓）</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="row">
+                <label>交易选项</label>
+                <div class="split">
+                  <div>
+                    <div class="pill">币种范围</div>
+                    <label class="check-row"><input type="checkbox" id="optMainstream" /> 主流币</label>
+                    <label class="check-row"><input type="checkbox" id="optAlt" /> 山寨币</label>
+                  </div>
+                  <div>
+                    <div class="pill">交易周期</div>
+                    <label class="check-row"><input type="checkbox" id="optScalp" /> 短线</label>
+                    <label class="check-row"><input type="checkbox" id="optIntraday" /> 日内</label>
+                    <label class="check-row"><input type="checkbox" id="optSwing" /> 中长线</label>
+                  </div>
+                  <div>
+                    <div class="pill">交易市场</div>
+                    <label class="check-row"><input type="checkbox" id="optSpot" /> 现货</label>
+                    <label class="check-row"><input type="checkbox" id="optDeriv" /> 合约</label>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div class="card">
+              <div class="card-header">
+                <h3>OKX 配置</h3>
+                <div class="card-subtitle">实盘/模拟盘与 API 凭据</div>
+              </div>
+              <div class="row">
+                <label>Base URL</label>
+                <input id="okxBaseUrl" placeholder="https://www.okx.com" />
+              </div>
+              <div class="row">
+                <label>交易模式</label>
+                <select id="okxTradeMode">
+                  <option value="real">实盘</option>
+                  <option value="demo">模拟盘</option>
+                </select>
+              </div>
+              <div class="row">
+                <label>API Key</label>
+                <input id="okxKey" placeholder="" />
+              </div>
+              <div class="row">
+                <label>API Secret</label>
+                <input id="okxSecret" placeholder="" />
+              </div>
+              <div class="row">
+                <label>Passphrase</label>
+                <input id="okxPass" placeholder="" />
+              </div>
+              <div class="row">
+                <label class="check-row"><input type="checkbox" id="okxWeEnabled" /> 启用 WebSocket（we_enabled）</label>
+              </div>
+            </div>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script src="/static/index.js"></script>
+  </body>
+</html>
