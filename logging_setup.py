@@ -29,7 +29,7 @@ def setup_logging(log_path: str = "logs/app.log", level: int = logging.INFO) -> 
     log_file.parent.mkdir(parents=True, exist_ok=True)
 
     formatter = logging.Formatter(
-        "%(asctime)s %(levelname)s %(name)s %(message)s"
+        "%(asctime)s %(levelname)s %(processName)s %(name)s %(message)s"
     )
 
     file_handler = TimedRotatingFileHandler(

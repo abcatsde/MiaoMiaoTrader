@@ -12,6 +12,7 @@ from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from Monitoring import MonitoringClient
+import logging
 from pydantic import BaseModel, Field
 
 
@@ -21,6 +22,7 @@ CONFIG_DIR = ROOT_DIR / "config"
 APP_CONFIG_PATH = CONFIG_DIR / "app.json"
 LLM_CONFIG_PATH = CONFIG_DIR / "llm.json"
 OKX_CONFIG_PATH = CONFIG_DIR / "okx.json"
+RESTART_SIGNAL_PATH = CONFIG_DIR / "restart.signal"
 
 
 class LLMProviderItem(BaseModel):
@@ -77,13 +79,16 @@ class TokenState:
 
 app = FastAPI(title="MiaoMiaoTrader Web Manager")
 TOKEN_STATE = TokenState(token=secrets.token_urlsafe(24))
+logger = logging.getLogger(__name__)
 
 app.mount("/static", StaticFiles(directory=str(BASE_DIR / "templates")), name="static")
 
 
 @app.on_event("startup")
 def _print_token() -> None:
-    print(f"[WebManager] Access token: {TOKEN_STATE.token}")
+    logger.info("==========")
+    logger.info("WebManager Access token: %s", TOKEN_STATE.token)
+    logger.info("==========")
 
 
 def _load_config() -> AppConfig:
@@ -144,6 +149,16 @@ def stats_page() -> str:
     return FileResponse(str(BASE_DIR / "templates" / "stats.html"))
 
 
+@app.get("/llm", response_class=HTMLResponse)
+def llm_page() -> str:
+    return FileResponse(str(BASE_DIR / "templates" / "llm.html"))
+
+
+@app.get("/advanced", response_class=HTMLResponse)
+def advanced_page() -> str:
+    return FileResponse(str(BASE_DIR / "templates" / "advanced.html"))
+
+
 @app.get("/api/config")
 def get_config(x_access_token: str | None = Header(default=None)) -> JSONResponse:
     _require_token(x_access_token)
@@ -164,7 +179,9 @@ def restart_app(x_access_token: str | None = Header(default=None)) -> JSONRespon
   _require_token(x_access_token)
   if os.environ.get("WEBMANAGER_ALLOW_RESTART", "1") != "1":
     raise HTTPException(status_code=403, detail="Restart disabled")
-  os._exit(0)
+    CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+    RESTART_SIGNAL_PATH.write_text("restart", encoding="utf-8")
+    return JSONResponse(content={"ok": True, "message": "重启已请求，服务将由主进程重启"})
 
 
 @app.get("/api/health")

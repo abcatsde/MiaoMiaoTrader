@@ -327,8 +327,28 @@ def run_robot() -> None:
             time.sleep(5)
             continue
 
+        interval = int(config.get("loop_interval_sec", 60))
+        providers_cfg = config.get("llm_providers", [])
+        enabled_llm = [
+            p
+            for p in providers_cfg
+            if p.get("enabled", True)
+            and p.get("endpoint")
+            and p.get("api_key")
+            and p.get("model")
+        ]
+        if not enabled_llm:
+            logger.warning("LLM未配置大模型，请前往web端或config文件配置。")
+            time.sleep(max(interval, 5))
+            continue
+
         try:
-            llm = _build_llm_client(config)
+            try:
+                llm = _build_llm_client(config)
+            except RuntimeError as exc:
+                logger.warning("LLM初始化失败：%s", exc)
+                time.sleep(max(interval, 5))
+                continue
             memory = MemoryClient()
             monitoring = MonitoringClient()
             planner = _build_planner(config, llm, memory, monitoring)
@@ -435,5 +455,4 @@ def run_robot() -> None:
             except Exception:
                 pass
 
-        interval = int(config.get("loop_interval_sec", 60))
         time.sleep(max(interval, 5))
