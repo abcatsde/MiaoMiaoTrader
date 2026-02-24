@@ -219,36 +219,117 @@ def _start_okx_ws(config: dict, monitoring: MonitoringClient) -> None:
     thread.start()
 
 
-def _build_planner_actions(memory: MemoryClient) -> dict[str, Callable[[dict[str, Any], Any], dict[str, Any]]]:
+def _build_planner_actions(
+    memory: MemoryClient,
+    okx: OKXAdapter | None = None,
+) -> dict[str, Callable[[dict[str, Any], Any], dict[str, Any]]]:
+    import ast
+
+    instruments_cache: dict[str, set[str]] = {}
+
+    def _parse_possible_obj(value: Any) -> Any:
+        if not isinstance(value, str):
+            return value
+        raw = value.strip()
+        if not raw:
+            return value
+        for parser in (json.loads, ast.literal_eval):
+            try:
+                return parser(raw)
+            except Exception:
+                continue
+        return value
+
+    def _ensure_list(value: Any) -> list[Any]:
+        value = _parse_possible_obj(value)
+        if isinstance(value, list):
+            return value
+        if isinstance(value, tuple):
+            return list(value)
+        if value is None:
+            return []
+        return [value]
+
+    def _resolve_inst_type(preferences: dict[str, Any], inputs: dict[str, Any]) -> str:
+        market = preferences.get("market") if isinstance(preferences.get("market"), dict) else None
+        if not market and isinstance(inputs.get("market"), dict):
+            market = inputs.get("market")
+        if market and market.get("derivatives") and not market.get("spot"):
+            return "SWAP"
+        return str(inputs.get("inst_type") or "SPOT")
+
+    def _get_valid_instruments(inst_type: str) -> set[str]:
+        if inst_type in instruments_cache:
+            return instruments_cache[inst_type]
+        if not okx:
+            instruments_cache[inst_type] = set()
+            return instruments_cache[inst_type]
+        try:
+            payload = okx.get_instruments(inst_type=inst_type)
+        except Exception:
+            instruments_cache[inst_type] = set()
+            return instruments_cache[inst_type]
+        data = payload.get("data") if isinstance(payload, dict) else None
+        inst_ids = {
+            str(item.get("instId"))
+            for item in (data or [])
+            if isinstance(item, dict) and item.get("instId")
+        }
+        instruments_cache[inst_type] = inst_ids
+        return inst_ids
+
+    def _normalize_pair(pair: str, inst_type: str, valid: set[str]) -> str | None:
+        candidate = pair.strip().upper()
+        if not candidate:
+            return None
+        if not valid:
+            return candidate
+        if candidate in valid:
+            return candidate
+        if inst_type == "SWAP" and not candidate.endswith("-SWAP"):
+            swap_candidate = f"{candidate}-SWAP"
+            if swap_candidate in valid:
+                return swap_candidate
+        if inst_type == "SPOT" and candidate.endswith("-SWAP"):
+            spot_candidate = candidate[: -len("-SWAP")]
+            if spot_candidate in valid:
+                return spot_candidate
+        return None
+
     def select_focus_universe(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
-        preferences = inputs.get("preferences") or {}
+        preferences = _parse_possible_obj(inputs.get("preferences") or {})
         if not isinstance(preferences, dict):
             preferences = {}
         max_pairs = int(inputs.get("max_pairs", preferences.get("max_pairs", 2)) or 2)
         pairs = inputs.get("pairs") or inputs.get("candidate_pairs") or inputs.get("candidates") or []
-        if isinstance(pairs, str):
-            try:
-                parsed = json.loads(pairs)
-                pairs = parsed if isinstance(parsed, list) else [pairs]
-            except Exception:
-                pairs = [pairs]
+        pairs_list = _ensure_list(pairs)
         flat_pairs: list[str] = []
-        for p in pairs:
+        for p in pairs_list:
             if isinstance(p, (list, tuple)):
                 flat_pairs.extend([str(x) for x in p])
             else:
                 flat_pairs.append(str(p))
-        if not pairs:
-            pairs = memory.get_focus_pairs(limit=max_pairs)
-        cleaned = [str(p) for p in (flat_pairs or pairs) if p and not str(p).startswith("$")]
+        if not pairs_list:
+            pairs_list = memory.get_focus_pairs(limit=max_pairs)
+        cleaned = [str(p) for p in (flat_pairs or pairs_list) if p and not str(p).startswith("$")]
+        inst_type = _resolve_inst_type(preferences, inputs)
+        valid = _get_valid_instruments(inst_type)
+        normalized: list[str] = []
+        for p in cleaned:
+            normalized_pair = _normalize_pair(p, inst_type, valid)
+            if normalized_pair:
+                normalized.append(normalized_pair)
+        if not normalized and cleaned:
+            normalized = cleaned
         timeframe = preferences.get("timeframe") or inputs.get("timeframe") or "15m"
         timeframes = inputs.get("timeframes") or preferences.get("timeframes") or [timeframe]
         if isinstance(timeframes, str):
             timeframes = [timeframes]
         return {
             "outputs": {
-                "focus_pairs": cleaned[:max_pairs],
+                "focus_pairs": normalized[:max_pairs],
                 "focus_timeframes": list(timeframes),
+                "inst_type": inst_type,
             }
         }
 
@@ -467,7 +548,7 @@ def run_robot() -> None:
                 pref_cfg = {}
             allowed = set(_build_allowed_actions(pref_cfg))
             actions.update({name: handler for name, handler in full_actions.items() if name in allowed})
-            actions.update(_build_planner_actions(memory))
+            actions.update(_build_planner_actions(memory, okx=okx))
 
             executor = Executor(actions=actions, monitoring=monitoring, memory=memory, backtest=backtest)
 
@@ -483,8 +564,10 @@ def run_robot() -> None:
             timeframes = _suggest_timeframes(pref)
             candidates: list[str] = []
             if not has_positions and not sleep_active:
+                market_cfg = pref.get("market", {}) if isinstance(pref.get("market", {}), dict) else {}
+                inst_type = "SWAP" if market_cfg.get("derivatives") and not market_cfg.get("spot") else "SPOT"
                 try:
-                    tickers_payload = okx.get_tickers(inst_type="SPOT")
+                    tickers_payload = okx.get_tickers(inst_type=inst_type)
                     candidates = _pick_candidate_pairs(tickers_payload, limit=5)
                 except Exception:
                     candidates = []

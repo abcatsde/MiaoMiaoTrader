@@ -87,36 +87,28 @@ class Executor:
         return ExecutionResult(success=success, context=ctx)
 
     def _format_step_start(self, step: PlanStep, ctx: ExecutionContext) -> str:
-        inputs = self._resolve_inputs(step, ctx)
         lang = self._get_log_lang()
         title = self._truncate(step.title)
         if lang == "zh":
             reason, stance = self._split_stance(step.reasoning)
-            inputs_text = self._format_kv(inputs, lang="zh")
-            parts = [f"步骤{step.step_id}开始：{title or step.action}（{step.action}）"]
+            parts = [f"步骤{step.step_id}开始：{title or '执行步骤'}"]
             if reason:
                 parts.append(f"理由：{reason}")
             if stance:
                 parts.append(f"态度：{stance}")
-            if inputs_text:
-                parts.append(f"输入：{inputs_text}")
             return "；".join(parts)
 
-        inputs_text = self._format_kv(inputs)
         reasoning = f" | rationale={self._truncate(step.reasoning)}" if step.reasoning else ""
-        return f"step.start:{step.step_id}:{step.action} | title={title}{reasoning} | inputs={inputs_text}"
+        return f"step.start:{step.step_id} | title={title or 'step'}{reasoning}"
 
     def _format_step_done(self, step: PlanStep, result: dict[str, Any], ctx: ExecutionContext) -> str:
-        outputs = result.get("outputs")
         obs = result.get("observations")
         dec = result.get("decisions")
         err = result.get("errors")
         lang = self._get_log_lang()
         if lang == "zh":
-            outputs_text = self._format_kv(outputs, lang="zh") if isinstance(outputs, dict) else self._truncate(outputs)
-            parts = [f"步骤{step.step_id}完成：{step.action}"]
-            if outputs is not None and outputs_text:
-                parts.append(f"输出：{outputs_text}")
+            title = self._truncate(step.title)
+            parts = [f"步骤{step.step_id}完成：{title or '执行步骤'}"]
             if obs:
                 parts.append(f"观察：{self._truncate(obs)}")
             if dec:
@@ -125,10 +117,8 @@ class Executor:
                 parts.append(f"错误：{self._truncate(err)}")
             return "；".join(parts)
 
-        outputs_text = self._format_kv(outputs) if isinstance(outputs, dict) else self._truncate(outputs)
-        parts = [f"step.done:{step.step_id}:{step.action}"]
-        if outputs is not None:
-            parts.append(f"outputs={outputs_text}")
+        title = self._truncate(step.title)
+        parts = [f"step.done:{step.step_id} | title={title or 'step'}"]
         if obs:
             parts.append(f"observations={self._truncate(obs)}")
         if dec:
