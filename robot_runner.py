@@ -536,7 +536,9 @@ def run_robot() -> None:
             _start_okx_ws(config, monitoring)
             alert_manager = PriceAlertManager(okx, monitoring=monitoring)
             backtest = BacktestEngine()
-
+            pref = config.get("trading_preferences", {})
+            if not isinstance(pref, dict):
+                pref = {}
             market_cfg = pref.get("market", {}) if isinstance(pref.get("market", {}), dict) else {}
             inst_type = "SWAP" if market_cfg.get("derivatives") and not market_cfg.get("spot") else "SPOT"
 
@@ -561,9 +563,6 @@ def run_robot() -> None:
             has_positions = bool(positions_data)
 
             watchlist = memory.get_focus_pairs(limit=10)
-            pref = config.get("trading_preferences", {})
-            if not isinstance(pref, dict):
-                pref = {}
             timeframes = _suggest_timeframes(pref)
             candidates: list[str] = []
             if not has_positions and not sleep_active:
