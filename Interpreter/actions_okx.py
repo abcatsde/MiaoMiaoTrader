@@ -51,7 +51,49 @@ def build_okx_actions(
     def place_order(inputs: dict[str, Any], _ctx: Any) -> dict[str, Any]:
         if monitoring:
             monitoring.increment_stat("okx_request_count")
-        result = okx.place_order(**inputs)
+        inst_id = _resolve_inst_id(inputs)
+        if not inst_id:
+            return _missing_inst_id("okx.place_order")
+
+        td_mode = (
+            inputs.get("td_mode")
+            or inputs.get("tdMode")
+            or inputs.get("mgn_mode")
+            or inputs.get("margin_mode")
+        )
+        if not td_mode:
+            td_mode = "isolated" if str(inst_id).upper().endswith("-SWAP") else "cash"
+
+        side = inputs.get("side")
+        ord_type = inputs.get("ord_type") or inputs.get("ordType") or inputs.get("type")
+        sz = inputs.get("sz") or inputs.get("size")
+        px = inputs.get("px") or inputs.get("price")
+
+        if not side or not ord_type or sz is None:
+            return {
+                "outputs": {"error": "missing order params"},
+                "decisions": [
+                    "下单参数不足：需要 side/ord_type/sz；现货 td_mode=cash，合约 td_mode=isolated/cross。"
+                ],
+            }
+
+        payload = {
+            "inst_id": inst_id,
+            "td_mode": str(td_mode),
+            "side": str(side),
+            "ord_type": str(ord_type),
+            "sz": str(sz),
+        }
+        if px is not None:
+            payload["px"] = str(px)
+        if inputs.get("pos_side") is not None:
+            payload["pos_side"] = inputs.get("pos_side")
+        if inputs.get("reduce_only") is not None:
+            payload["reduce_only"] = inputs.get("reduce_only")
+        if inputs.get("cl_ord_id") is not None:
+            payload["cl_ord_id"] = inputs.get("cl_ord_id")
+
+        result = okx.place_order(**payload)
         if monitoring:
             monitoring.increment_stat("trade_count")
         return {"outputs": {"order_result": result}}

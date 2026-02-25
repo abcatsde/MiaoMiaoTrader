@@ -165,6 +165,7 @@ def _build_planner(
         ("合约", market_cfg.get("derivatives")),
     ) if enabled]
     planner_cfg = PlannerConfig(
+        max_steps=int(config.get("planner_max_steps", 0) or 0),
         max_pairs=int(pref.get("max_pairs", 2)),
         max_timeframes=int(pref.get("max_timeframes", 2)),
         trading_universe=universe or ["主流币"],
@@ -344,6 +345,8 @@ def _build_planner_actions(
                     flat.append(str(p))
             pairs = flat
         timeframes = inputs.get("timeframes", ["15m"])
+        if not pairs:
+            return {"decisions": ["无有效币对，跳过观察。"]}
         obs = f"观察{pairs}在{timeframes}周期下的趋势、支撑阻力与成交量变化。"
         return {"observations": [obs], "outputs": {"focus_observations": obs}}
 
@@ -372,10 +375,7 @@ def _build_planner_actions(
             pairs = [pairs]
         cleaned = [str(p) for p in pairs if p and not str(p).startswith("$")]
         if not cleaned:
-            return {
-                "outputs": {"watchlist_added": []},
-                "decisions": ["未提供有效币对，跳过加入关注。"],
-            }
+            return {"outputs": {"watchlist_added": []}}
         memory.upsert_focus_pairs(cleaned)
         return {"outputs": {"watchlist_added": cleaned}}
 
@@ -537,8 +537,11 @@ def run_robot() -> None:
             alert_manager = PriceAlertManager(okx, monitoring=monitoring)
             backtest = BacktestEngine()
 
+            market_cfg = pref.get("market", {}) if isinstance(pref.get("market", {}), dict) else {}
+            inst_type = "SWAP" if market_cfg.get("derivatives") and not market_cfg.get("spot") else "SPOT"
+
             if not startup_positions_fetched:
-                _refresh_positions_stats(okx, monitoring, inst_type="SWAP")
+                _refresh_positions_stats(okx, monitoring, inst_type=inst_type)
                 startup_positions_fetched = True
 
             actions = {}
@@ -552,7 +555,7 @@ def run_robot() -> None:
 
             executor = Executor(actions=actions, monitoring=monitoring, memory=memory, backtest=backtest)
 
-            positions_info = _refresh_positions_stats(okx, monitoring, inst_type="SWAP")
+            positions_info = _refresh_positions_stats(okx, monitoring, inst_type=inst_type)
             positions_data = positions_info["positions"]
             position_ids = positions_info["position_ids"]
             has_positions = bool(positions_data)
@@ -564,8 +567,6 @@ def run_robot() -> None:
             timeframes = _suggest_timeframes(pref)
             candidates: list[str] = []
             if not has_positions and not sleep_active:
-                market_cfg = pref.get("market", {}) if isinstance(pref.get("market", {}), dict) else {}
-                inst_type = "SWAP" if market_cfg.get("derivatives") and not market_cfg.get("spot") else "SPOT"
                 try:
                     tickers_payload = okx.get_tickers(inst_type=inst_type)
                     candidates = _pick_candidate_pairs(tickers_payload, limit=5)

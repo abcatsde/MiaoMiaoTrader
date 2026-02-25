@@ -14,12 +14,14 @@
       "swing": false
     },
     "market": {
-      "spot": true,
-      "derivatives": false
+      "spot": false,
+      "derivatives": true
     }
   },
-  "task_goal": "基于 15m 日内策略观察 1-2 个币对，必要时设置价格预警",
-  "task_context": "默认日内观察",
+  "task_goal": "你是一个虚拟货币交易员，请你观察市场行情寻找交易机会，若满足入场条件则直接下单，否则继续观察或设置价格预警",
+  "task_context": "默认日内观察；当信号明确时允许自动下单",
   "loop_interval_sec": 60,
+  "planner_max_steps": 0,
+  "quiet_events": ["ws.message"],
   "web_port": 8088
 }

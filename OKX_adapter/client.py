@@ -301,6 +301,9 @@ class OKXAdapter:
     def get_positions(self, inst_type: str = "SWAP") -> dict[str, Any]:
         return self._client.get_positions(inst_type=inst_type)
 
+    def get_account_balance(self) -> dict[str, Any]:
+        return self._client.get_account_balance()
+
     def set_leverage(
         self,
         *,

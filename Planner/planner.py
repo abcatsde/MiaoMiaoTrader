@@ -103,7 +103,7 @@ class Planner:
         try:
             prompt = (
                 "你是交易机器人播报员。请阅读规划输出，并用自然中文播报接下来要做的步骤。"
-                "要求：1-3 句话，简洁清晰，避免技术字段名；若步骤里包含观察/理由，可自然提及。"
+                "要求：简洁清晰，避免技术字段名；若步骤里包含观察/理由，可自然提及。"
                 "\n规划 JSON：\n"
                 f"{raw}\n"
             )
@@ -142,13 +142,17 @@ class Planner:
             "- If there are open positions, prioritize monitoring positions and related pairs.\n"
             "- If there are no positions/orders, actively scan the market for opportunities.\n"
             "- When interested in a pair, request more data (other timeframes, orderbook, trades).\n"
-            "- If a pair is worth long-term attention, add it to the watchlist.\n"
+            "- Add to watchlist only when you have concrete pairs; otherwise skip that step.\n"
+            "- If entry conditions are met, place an order with complete parameters.\n"
             "- You may set a sleep interval to pause scanning: use planner.set_sleep with seconds.\n"
+            "- Keep steps minimal and adaptive: merge similar actions, skip unnecessary steps.\n"
+            "- If no valid focus pairs are available, do not observe or add watchlist; set a short sleep and stop.\n"
+            "- Avoid repeating one step per pair when a single step can cover multiple pairs.\n"
         )
         policy_block = (
             "\nTrading preferences:\n"
             "- Focus on intraday trading with 15m timeframe. Avoid ultra-short-term or long-term.\n"
-            "- Distinguish margin mode: tdMode='isolated' (逐仓) or tdMode='cross' (全仓) when placing orders.\n"
+            "- Spot orders use tdMode='cash'; derivatives use tdMode='isolated' or 'cross'.\n"
             f"- Universe: {', '.join(self._config.trading_universe)}\n"
             f"- Horizon: {', '.join(self._config.trading_horizon)}\n"
             f"- Market: {', '.join(self._config.trading_market)}\n"
@@ -156,7 +160,7 @@ class Planner:
         return (
             "你是交易规划助手。请输出中文的步骤列表，每步包含：title、action、inputs、outputs、rationale。"
             "rationale 要简短（<=20字），并可包含态度：偏多/偏空/中性。"
-            "步骤数量不超过上限，表达简洁。"
+            "步骤数量可自行决定，尽量精简，避免无意义步骤。"
             f"\n目标：{task.goal}"
             f"{context_block}"
             f"{memory_block}"
@@ -273,7 +277,7 @@ class Planner:
                     outputs=outputs,
                 )
             )
-            if len(steps) >= self._config.max_steps:
+            if self._config.max_steps > 0 and len(steps) >= self._config.max_steps:
                 break
         return steps
 
@@ -326,7 +330,7 @@ class Planner:
                     outputs=[str(x) for x in outputs],
                 )
             )
-            if len(steps) >= self._config.max_steps:
+            if self._config.max_steps > 0 and len(steps) >= self._config.max_steps:
                 break
         return steps or None
 

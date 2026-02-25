@@ -3,6 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime
 import logging
+from pathlib import Path
 import sqlite3
 from typing import List, Optional
 
@@ -22,6 +23,29 @@ class MonitoringClient:
     def __init__(self, config: Optional[MonitoringConfig] = None) -> None:
         self._config = config or MonitoringConfig()
         self._ensure_schema()
+
+    def _is_quiet_event(self, message: str) -> bool:
+        config_path = Path(__file__).resolve().parents[1] / "config" / "app.json"
+        if not config_path.exists():
+            return False
+        try:
+            data = json.loads(config_path.read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        quiet = data.get("quiet_events")
+        if not isinstance(quiet, list):
+            return False
+        for rule in quiet:
+            if not isinstance(rule, str):
+                continue
+            rule = rule.strip()
+            if not rule:
+                continue
+            if rule.endswith("*") and message.startswith(rule[:-1]):
+                return True
+            if rule == message:
+                return True
+        return False
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(self._config.db_path)
@@ -75,6 +99,8 @@ class MonitoringClient:
         if not message.strip():
             return
         payload = message.strip()
+        if self._is_quiet_event(payload):
+            return
         with self._connect() as conn:
             conn.execute(
                 """
