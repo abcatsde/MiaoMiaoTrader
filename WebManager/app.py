@@ -7,11 +7,12 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List
 
-from fastapi import FastAPI, Header, HTTPException
+from fastapi import FastAPI, Header, HTTPException, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from Monitoring import MonitoringClient
+from OKX_adapter import OKXAdapter, OKXClient, OKXConfig
 import logging
 from pydantic import BaseModel, Field
 
@@ -157,6 +158,49 @@ def _save_config(config: AppConfig) -> None:
     )
 
 
+def _build_okx_from_config(config: AppConfig) -> OKXAdapter | None:
+    okx_cfg = config.okx
+    if not (okx_cfg.api_key and okx_cfg.api_secret and okx_cfg.passphrase):
+        return None
+    client = OKXClient(
+        OKXConfig(
+            base_url=okx_cfg.base_url or "https://www.okx.com",
+            api_key=okx_cfg.api_key,
+            api_secret=okx_cfg.api_secret,
+            passphrase=okx_cfg.passphrase,
+            trade_mode=okx_cfg.trade_mode or "real",
+        )
+    )
+    return OKXAdapter(client)
+
+
+def _refresh_positions_stats_from_okx(
+    okx: OKXAdapter,
+    monitoring: MonitoringClient,
+    inst_type: str,
+) -> None:
+    positions_payload: dict = {}
+    try:
+        positions_payload = okx.get_positions(inst_type=inst_type)
+    except Exception as exc:
+        logger.warning("Web stats refresh positions failed: %s", exc)
+        return
+
+    positions_data = positions_payload.get("data") if isinstance(positions_payload, dict) else None
+    position_ids = [p.get("instId") for p in (positions_data or []) if isinstance(p, dict)]
+    try:
+        unrealized = 0.0
+        for p in positions_data or []:
+            if not isinstance(p, dict):
+                continue
+            upl = p.get("upl") or p.get("uPnl") or 0
+            unrealized += float(upl)
+        monitoring.set_stat("pnl_unrealized", str(unrealized))
+        monitoring.set_stat("current_positions", json.dumps(position_ids, ensure_ascii=False))
+    except Exception as exc:
+        logger.warning("Web stats update failed: %s", exc)
+
+
 def _require_token(x_access_token: str | None) -> None:
     if not x_access_token or x_access_token != TOKEN_STATE.token:
         raise HTTPException(status_code=401, detail="Invalid token")
@@ -230,9 +274,19 @@ def health() -> JSONResponse:
 
 
 @app.get("/api/stats")
-def stats(x_access_token: str | None = Header(default=None)) -> JSONResponse:
+def stats(
+    x_access_token: str | None = Header(default=None),
+    refresh_okx: bool = Query(default=True),
+) -> JSONResponse:
     _require_token(x_access_token)
     monitoring = MonitoringClient()
+    if refresh_okx:
+        config = _load_config()
+        okx = _build_okx_from_config(config)
+        if okx is not None:
+            market_cfg = config.trading_preferences.market or {}
+            inst_type = "SWAP" if market_cfg.get("derivatives") and not market_cfg.get("spot") else "SPOT"
+            _refresh_positions_stats_from_okx(okx, monitoring, inst_type)
     return JSONResponse(content=monitoring.get_stats())
 
 
